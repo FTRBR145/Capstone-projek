@@ -1,18 +1,18 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import api from '../services/api'
 import Footer from '../components/layout/Footer'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 
-// Icons component (same as before)
 const Icon = ({ name, size = 16, className = '' }) => {
   // ... (same Icon component code)
 }
 
 export default function Settings() {
-  const { user, updateProfile: authUpdateProfile, deleteAccount: authDeleteAccount, logout } = useAuth()
+  const { user, updateProfile: authUpdateProfile, uploadAvatar, deleteAvatar, deleteAccount: authDeleteAccount, logout } = useAuth()
   const toast = useToast()
+  const fileInputRef = useRef(null)
 
   const [name, setName] = useState(user?.name || '')
   const [email] = useState(user?.email || '')
@@ -22,7 +22,8 @@ export default function Settings() {
   const [loading, setLoading] = useState({
     profile: false,
     password: false,
-    delete: false
+    delete: false,
+    avatar: false
   })
 
   const handleDeleteAccount = async () => {
@@ -40,6 +41,49 @@ export default function Settings() {
     } finally {
       setLoading(prev => ({ ...prev, delete: false }))
       setShowDeleteConfirm(false)
+    }
+  }
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ukuran file maksimal 2MB')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('avatar', file)
+
+    setLoading(prev => ({ ...prev, avatar: true }))
+    try {
+      const result = await uploadAvatar(formData)
+      if (result.success) {
+        toast.success('Foto profil berhasil diperbarui 📸')
+      } else {
+        toast.error(result.message)
+      }
+    } catch (error) {
+      toast.error('Gagal upload foto profil')
+    } finally {
+      setLoading(prev => ({ ...prev, avatar: false }))
+    }
+  }
+
+  const handleDeleteAvatar = async () => {
+    setLoading(prev => ({ ...prev, avatar: true }))
+    try {
+      const result = await deleteAvatar()
+      if (result.success) {
+        toast.success('Foto profil berhasil dihapus 🗑️')
+      } else {
+        toast.error(result.message)
+      }
+    } catch (error) {
+      toast.error('Gagal hapus foto profil')
+    } finally {
+      setLoading(prev => ({ ...prev, avatar: false }))
     }
   }
 
@@ -97,19 +141,64 @@ export default function Settings() {
     <div className="text-white pb-10 animate-fade-in font-['Inter',_sans-serif]">
       <h2 className="text-[24px] font-normal mb-10">Profile Anda</h2>
 
-      {/* Center Avatar Section */}
       <div className="flex flex-col items-center mb-10">
-        <div className="w-[100px] h-[100px] bg-[#c1d3c1] rounded-full flex items-center justify-center shadow-[0_0_0_6px_rgba(255,255,255,0.1)] mb-4">
-          <Icon name="user-large" size={48} className="text-white" />
+        <div 
+          className="relative group cursor-pointer mb-4" 
+          onClick={() => !loading.avatar && fileInputRef.current?.click()}
+        >
+          <div className="w-[100px] h-[100px] bg-[#e5e7eb] rounded-full flex items-center justify-center shadow-[0_0_0_6px_rgba(255,255,255,0.1)] overflow-hidden">
+            {user?.avatar ? (
+              <img 
+                src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`} 
+                alt="Avatar" 
+                className="w-full h-full object-cover" 
+              />
+            ) : (
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full bg-[#f3f4f6]">
+                <circle cx="50" cy="35" r="22" fill="#9ca3af" />
+                <path d="M15 95 C 15 65, 85 65, 85 95" fill="#9ca3af" />
+              </svg>
+            )}
+          </div>
+          
+          <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
+            {loading.avatar ? (
+              <span className="text-white text-[12px] font-medium">Loading...</span>
+            ) : (
+              <>
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" className="mb-1">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 0 1 2-2h3.5l1.5-2h4l1.5 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                <span className="text-[10px] text-white font-medium">Ubah Foto</span>
+              </>
+            )}
+          </div>
         </div>
-        <h3 className="text-[32px] font-normal text-white text-center m-0">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleAvatarChange} 
+          accept="image/*" 
+          className="hidden" 
+        />
+        <h3 className="text-[32px] font-normal text-white text-center m-0 mb-2">
           {user?.name || 'Nama Pengguna'}
         </h3>
+        {user?.avatar && (
+          <button 
+            type="button"
+            onClick={handleDeleteAvatar}
+            disabled={loading.avatar}
+            className="bg-transparent border border-[#ff6b6b] text-[#ff6b6b] rounded-full py-1.5 px-4 text-[12px] cursor-pointer transition-colors hover:bg-[#ff6b6b] hover:text-white"
+          >
+            Hapus Foto Profil
+          </button>
+        )}
       </div>
 
       <div className="max-w-[700px] mx-auto flex flex-col gap-8">
         
-        {/* Profile Settings Panel */}
         <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/5">
           <form onSubmit={handleProfileSave} className="flex flex-col gap-6">
             <div className="flex flex-col gap-2">
@@ -148,7 +237,6 @@ export default function Settings() {
           </form>
         </div>
 
-        {/* Security Settings Panel */}
         <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-white/5">
           <h4 className="text-[18px] font-medium text-white mb-6 m-0 flex items-center gap-2">
             <Icon name="lock" size={18} /> Keamanan
@@ -190,7 +278,6 @@ export default function Settings() {
           </form>
         </div>
 
-        {/* Danger Zone Panel */}
         <div className="bg-[#3a1c1c] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(200,50,50,0.1)_100%)] rounded-[18px] p-6 md:p-8 shadow-[0_4px_20px_rgba(0,0,0,0.3)] border border-red-500/20">
           <h4 className="text-[18px] font-medium text-[#ff6b6b] mb-3 m-0 flex items-center gap-2">
             <Icon name="warning" size={18} /> Zona Berbahaya

@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
@@ -23,6 +24,9 @@ if (process.env.NODE_ENV === 'development') {
     next();
   });
 }
+
+// Serve static files for uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);

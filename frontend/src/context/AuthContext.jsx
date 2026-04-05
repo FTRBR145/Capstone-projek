@@ -27,9 +27,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error('Login error:', error.response?.data || error.message)
       
-      // Tangani berbagai jenis error
       if (error.response) {
-        // Server merespon dengan error
         const status = error.response.status
         const message = error.response.data?.message || 'Login gagal'
         const errors = error.response.data?.errors
@@ -45,20 +43,17 @@ export function AuthProvider({ children }) {
             message: 'Email tidak terdaftar' 
           }
         } else if (errors) {
-          // Validation errors
           const errorMessages = errors.map(err => err.message).join(', ')
           return { success: false, message: errorMessages }
         } else {
           return { success: false, message }
         }
       } else if (error.request) {
-        // Request dibuat tapi tidak ada response
         return { 
           success: false, 
           message: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.' 
         }
       } else {
-        // Error lainnya
         return { 
           success: false, 
           message: 'Terjadi kesalahan. Silakan coba lagi.' 
@@ -67,7 +62,6 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // FUNGSI REGISTER
   const register = useCallback(async (name, email, password, captchaToken) => {
     try {
       console.log('Register attempt:', { name, email })
@@ -97,7 +91,6 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // FUNGSI GOOGLE LOGIN
   const googleLogin = useCallback(async (credentialResponse) => {
     try {
       const response = await api.post('/auth/google', { credential: credentialResponse.credential })
@@ -117,14 +110,12 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // FUNGSI LOGOUT
   const logout = useCallback(() => {
     setUser(null)
     localStorage.removeItem('tabunganqu_user')
     localStorage.removeItem('tabunganqu_token')
   }, [])
 
-  // FUNGSI UPDATE PROFILE
   const updateProfile = useCallback(async (updates) => {
     try {
       const response = await api.put('/auth/profile', updates)
@@ -144,11 +135,50 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // FUNGSI DELETE ACCOUNT
+  const uploadAvatar = useCallback(async (formData) => {
+    try {
+      const response = await api.post('/auth/profile/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+      const updatedUser = response.data.data.user
+      
+      localStorage.setItem('tabunganqu_user', JSON.stringify(updatedUser))
+      setUser(updatedUser)
+      
+      return { success: true }
+    } catch (error) {
+      console.error('Upload avatar error:', error.response?.data || error.message)
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Upload foto profil gagal.' 
+      }
+    }
+  }, [])
+
+  const deleteAvatar = useCallback(async () => {
+    try {
+      const response = await api.delete('/auth/profile/avatar')
+      const updatedUser = response.data.data.user
+      
+      localStorage.setItem('tabunganqu_user', JSON.stringify(updatedUser))
+      setUser(updatedUser)
+      
+      return { success: true }
+    } catch (error) {
+      console.error('Delete avatar error:', error.response?.data || error.message)
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Hapus foto profil gagal.' 
+      }
+    }
+  }, [])
+
   const deleteAccount = useCallback(async () => {
     try {
       await api.delete('/auth/account')
-      logout() // Panggil fungsi logout
+      logout()
       return { success: true }
     } catch (error) {
       console.error('Delete account error:', error.response?.data || error.message)
@@ -158,9 +188,8 @@ export function AuthProvider({ children }) {
         message: error.response?.data?.message || 'Hapus akun gagal.' 
       }
     }
-  }, [logout]) // Tambah dependency logout
+  }, [logout])
 
-  // Value yang akan di-provide ke seluruh app
   const value = {
     user,
     login,
@@ -168,6 +197,8 @@ export function AuthProvider({ children }) {
     googleLogin,
     logout,
     updateProfile,
+    uploadAvatar,
+    deleteAvatar,
     deleteAccount
   }
 

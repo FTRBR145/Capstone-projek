@@ -1,7 +1,6 @@
 import api from './api'
 
 export const wishlistService = {
-  // Get all wishlists
   getWishlists: async (search = '') => {
     try {
       console.log('📥 Fetching wishlists...');
@@ -15,12 +14,10 @@ export const wishlistService = {
     }
   },
 
-  // Create wishlist
   createWishlist: async (data) => {
     try {
       console.log('📤 Creating wishlist:', data);
       
-      // Konversi ke format yang diterima backend
       const payload = {
         name: data.name,
         targetAmount: data.targetAmount || data.target_amount,
@@ -36,12 +33,10 @@ export const wishlistService = {
     }
   },
 
-  // Update wishlist
   updateWishlist: async (id, data) => {
     try {
       console.log(`📤 Updating wishlist ${id}:`, data);
       
-      // Pastikan format data sesuai dengan yang diharapkan backend
       const response = await api.put(`/wishlists/${id}`, data)
       console.log('✅ Wishlist updated:', response.data);
       return response.data
@@ -51,7 +46,6 @@ export const wishlistService = {
     }
   },
 
-  // Delete wishlist
   deleteWishlist: async (id) => {
     try {
       console.log('🗑️ Deleting wishlist:', id);
@@ -64,7 +58,6 @@ export const wishlistService = {
     }
   },
 
-  // AUTO-DETECT: Cari wishlist yang cocok dengan deskripsi
   detectWishlistFromDescription: async (description, wishlists) => {
     if (!description || !wishlists || wishlists.length === 0) {
       console.log('No description or wishlists')
@@ -74,14 +67,12 @@ export const wishlistService = {
     const descLower = description.toLowerCase()
     console.log('Searching for:', descLower, 'in', wishlists.length, 'wishlists')
     
-    // Cari wishlist yang namanya ada di dalam deskripsi
     let matchedWishlist = null
     let bestMatchScore = 0
     
     wishlists.forEach(wishlist => {
       const wishlistName = wishlist.name.toLowerCase()
       
-      // Exact match
       if (descLower.includes(wishlistName)) {
         const score = wishlistName.length
         if (score > bestMatchScore) {
@@ -90,7 +81,6 @@ export const wishlistService = {
         }
       }
       
-      // Partial match (kata per kata)
       const words = descLower.split(' ')
       words.forEach(word => {
         if (word.length > 3 && wishlistName.includes(word)) {

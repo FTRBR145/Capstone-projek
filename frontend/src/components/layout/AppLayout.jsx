@@ -11,7 +11,6 @@ export default function AppLayout() {
 
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      {/* Main content area */}
       <div className="flex flex-1 flex-col h-screen overflow-y-auto overflow-x-hidden">
         <Navbar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
         

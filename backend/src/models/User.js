@@ -33,7 +33,7 @@ class User {
     const values = [];
 
     for (const [key, value] of Object.entries(updates)) {
-      if (allowedUpdates.includes(key) && value) {
+      if (allowedUpdates.includes(key) && value !== undefined) {
         fields.push(`${key} = ?`);
         values.push(value);
       }

@@ -1,89 +1,27 @@
-# 📱 TabunganQu - Aplikasi Pengelola Keuangan Pribadi
+# TabunganQu
 
-TabunganQu adalah aplikasi **Full Stack** untuk mengelola keuangan pribadi dengan fitur pencatatan transaksi, wishlist tabungan, dan dashboard interaktif. Dibangun dengan React.js (Frontend) dan Node.js + Express (Backend) dengan database MySQL.
+Selamat datang di repo TabunganQu.  
+Proyek ini adalah aplikasi pengelola keuangan pribadi berbasis web untuk membantu pengguna mencatat pemasukan, pengeluaran, dan target tabungan dengan lebih mudah dan terstruktur.
 
-## 🚀 Cara View README.md
+## Persyaratan
+- Node.js v18 atau lebih baru
+- MySQL v8 atau lebih baru
+- NPM
 
-Buka file README.md di Visual Studio Code
+## Langkah Instalasi
 
-Tekan:
-Ctrl + Shift + V
+1. **Clone repository ini**:
+   ```bash
+   git clone https://github.com/G-breel/Capstone-projek.git
+   cd Capstone-projek
+   ```
 
-👉 langsung muncul preview
-
-## ✨ Fitur Utama
-
-- 🔐 **Autentikasi** - Register, Login, Logout dengan JWT
-- 💰 **Manajemen Transaksi** - Catat pemasukan & pengeluaran
-- 🎯 **Wishlist Tabungan** - Buat target tabungan dan lacak progress
-- 📊 **Dashboard Interaktif** - Ringkasan keuangan dengan chart
-- 🤖 **Auto-Update Wishlist** - Tabungan otomatis terupdate dari transaksi
-- 🔍 **Filter & Search** - Cari transaksi per bulan dan wishlist
-- 📱 **Responsive Design** - Bisa diakses dari HP, tablet, dan desktop
-
----
-
-## 🛠️ **Teknologi yang Digunakan**
-
-### **Frontend:**
-- React.js 19
-- Vite (Module Bundler)
-- TailwindCSS (Styling)
-- React Router DOM (Routing)
-- Recharts (Chart & Grafik)
-- Axios (HTTP Client)
-
-### **Backend:**
-- Node.js
-- Express.js
-- MySQL (Database)
-- JWT (Authentication)
-- Bcrypt (Password Hashing)
-- Express Validator (Validation)
-
----
-
-## 📋 **Prasyarat**
-
-Sebelum menjalankan aplikasi, pastikan kamu sudah menginstall:
-
-1. **Node.js** (v18 atau lebih baru) - [Download](https://nodejs.org)
-2. **MySQL** (v8 atau lebih baru) - [Download](https://www.mysql.com/downloads/)
-3. **Git** (opsional) - [Download](https://git-scm.com)
-4. **Browser Modern** (Chrome, Firefox, Edge, dll)
-
-Cek instalasi:
-```bash
-node --version
-npm --version
-mysql --version
-```
-
----
-
-## 🚀 **Cara Menjalankan Aplikasi**
-
-### **Langkah 1: Clone Repository**
-```bash
-git clone https://github.com/username/tabunganqu.git
-cd tabunganqu
-```
-
-Atau jika tidak menggunakan Git, download ZIP dan extract.
-
----
-
-### **Langkah 2: Setup Database MySQL**
-
-#### **2.1 Login ke MySQL**
-```bash
-mysql -u root -p
-# Masukkan password MySQL kamu
-```
-
-#### **2.2 Buat Database dan Tables**
+2. **Setup Database**:
+   ```bash
+   mysql -u root -p < database/schema.sql
+   ```
+**2.2 Buat Database dan Tables**
 Copy paste SQL berikut di terminal MySQL:
-
 ```sql
 -- Create database
 CREATE DATABASE IF NOT EXISTS tabunganqu_db;
@@ -94,8 +32,9 @@ CREATE TABLE IF NOT EXISTS users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NULL,
     avatar VARCHAR(255) NULL,
+    google_id VARCHAR(255) NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_email (email)
@@ -129,47 +68,59 @@ CREATE TABLE IF NOT EXISTS wishlists (
     INDEX idx_user_id (user_id)
 );
 
--- Show tables
-SHOW TABLES;
+-- Drop view if exists before creating
+DROP VIEW IF EXISTS user_summary;
 
--- Exit MySQL
-EXIT;
+-- Create view for easier reporting
+CREATE VIEW user_summary AS
+SELECT 
+    u.id as user_id,
+    u.name,
+    u.email,
+    COALESCE(SUM(CASE WHEN t.type = 'pemasukan' THEN t.amount ELSE 0 END), 0) as total_pemasukan,
+    COALESCE(SUM(CASE WHEN t.type = 'pengeluaran' THEN t.amount ELSE 0 END), 0) as total_pengeluaran,
+    COUNT(DISTINCT w.id) as total_wishlist
+FROM users u
+LEFT JOIN transactions t ON u.id = t.user_id
+LEFT JOIN wishlists w ON u.id = w.user_id
+GROUP BY u.id, u.name, u.email;
 ```
 
----
+3. **Install dependencies untuk Backend**:
+   ```bash
+   cd backend
+   npm install
+   ```
 
-### **Langkah 3: Setup Backend**
+4. **Install dependencies untuk Frontend**:
+   ```bash
+   cd ../frontend
+   npm install
+   ```
 
-#### **3.1 Masuk ke folder backend**
-```bash
-cd backend
+
+## Struktur Proyek
 ```
-
-#### **3.2 Install dependencies**
-```bash
-npm install
-```
-
-#### **3.3 Buat file .env**
-Buat file `.env` di folder `backend` dengan isi:
-
-```env
-# Server Configuration
-PORT = 5000
-NODE_ENV = development
-
-# Database Configuration
-DB_HOST = localhost
-DB_USER = root
-DB_PASSWORD = your_mysql_password_here  # GANTI dengan password MySQL kamu
-DB_NAME = tabunganqu_db
-
-# JWT Configuration
-JWT_SECRET = tabunganqu_super_secret_key_2026  # GANTI untuk production
-JWT_EXPIRE = 7d
-
-# CORS Configuration
-CLIENT_URL = http://localhost:5173
+Capstone-projek/
+├── backend/               # Kode sumber backend (Node.js + Express)
+│   ├── src/
+│   │   ├── config/        # Konfigurasi database
+│   │   ├── controllers/   # Logika bisnis
+│   │   ├── middleware/    # Auth & validasi
+│   │   ├── models/        # Model database
+│   │   └── routes/        # Endpoint API
+│   └── .env
+├── frontend/              # Kode sumber frontend (React + Vite)
+│   ├── src/
+│   │   ├── components/    # Komponen reusable
+│   │   ├── context/       # State management
+│   │   ├── pages/         # Halaman aplikasi
+│   │   ├── services/      # API services
+│   │   └── utils/         # Helper functions
+│   └── .env
+├── database/              # File SQL database
+│   └── schema.sql
+└── README.md
 ```
 
 #### **3.4 Jalankan backend**
@@ -251,7 +202,7 @@ VITE v4.x.x  ready in xxx ms
 - Centang captcha
 - Klik "Login"
 
-### **3. Dashboard**    
+### **3. Dashboard**
 - Lihat ringkasan saldo
 - Grafik pemasukan/pengeluaran
 - Preview wishlist

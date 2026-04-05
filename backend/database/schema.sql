@@ -43,8 +43,11 @@ CREATE TABLE IF NOT EXISTS wishlists (
     INDEX idx_user_id (user_id)
 );
 
--- Create views for easier reporting
-CREATE VIEW IF NOT EXISTS user_summary AS
+-- Drop view if exists before creating
+DROP VIEW IF EXISTS user_summary;
+
+-- Create view for easier reporting
+CREATE VIEW user_summary AS
 SELECT 
     u.id as user_id,
     u.name,

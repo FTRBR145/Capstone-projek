@@ -14,7 +14,6 @@ export default function Landing() {
 
   return (
     <div className="bg-[#1d251f] text-white font-['Inter',_sans-serif] min-h-screen overflow-x-hidden">
-      {/* Navbar */}
       <nav className="flex justify-between items-center py-5 px-5 md:py-6 md:px-16 bg-[linear-gradient(180deg,rgba(0,0,0,0.2)_0%,rgba(255,255,255,0.1)_100%),linear-gradient(to_left,#25390f,#25390f)] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)] relative z-10 animate-fade-in">
         <div className="font-['Inter',_sans-serif] text-[32px] text-white">TabunganQu</div>
         <div className="flex items-center gap-8">
@@ -31,7 +30,6 @@ export default function Landing() {
       </nav>
 
       <main>
-        {/* Hero Section */}
         <section className="flex flex-col items-center text-center gap-10 pt-10 pb-[80px] px-[10%] min-h-[70vh] bg-[#262d27] border-b-2 border-[#272c21] min-[993px]:flex-row min-[993px]:text-left min-[993px]:gap-0 min-[993px]:py-[80px] min-[993px]:justify-between">
           <div className="flex flex-col items-center flex-1 max-w-[600px] animate-slide-in-up min-[993px]:items-start">
             <h1 className="font-['Inter',_sans-serif] font-normal text-[32px] leading-[1.2] m-0 mb-6 md:text-[48px]">
@@ -57,17 +55,21 @@ export default function Landing() {
             </div>
           </div>
           <div className="flex justify-center w-full flex-1 animate-fade-in [animation-delay:200ms] min-[993px]:justify-end min-[993px]:w-auto">
-            <div className="flex items-center justify-center w-[400px] h-[300px] bg-white/5 border-2 border-dashed border-white/20 rounded-xl text-white/50 text-[20px]">
-              Gambar 1.1
+            <div className="flex items-center justify-center w-[400px] h-[300px] bg-gradient-to-tr from-[#10b981]/20 to-[#3b82f6]/20 border border-white/10 rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.1)] relative overflow-hidden group">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] opacity-20 group-hover:opacity-30 transition-opacity"></div>
+              <svg className="w-24 h-24 text-emerald-400 opacity-60 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
           </div>
         </section>
 
-        {/* Problem Section */}
         <section className="flex flex-col-reverse items-center text-center gap-10 py-[100px] px-[10%] bg-[#1d251f] min-[993px]:flex-row min-[993px]:text-left min-[993px]:gap-[60px]">
           <div className="flex-1 w-full animate-fade-in">
-            <div className="flex items-center justify-center w-full h-[350px] bg-white/5 border-2 border-dashed border-white/20 rounded-xl text-white/50 text-[20px]">
-              Gambar 1.2
+            <div className="flex items-center justify-center w-full h-[350px] bg-gradient-to-bl from-red-500/10 to-orange-500/10 border border-white/5 rounded-2xl shadow-inner relative overflow-hidden">
+              <svg className="w-20 h-20 text-red-400/50 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
             </div>
           </div>
           <div className="flex-1 animate-slide-in-right">
@@ -81,7 +83,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Features Section */}
         <section className="py-[100px] px-[10%] bg-[#2f3430] animate-fade-in">
           <h2 className="font-['Inter',_sans-serif] font-normal text-[32px] leading-[1.3] m-0 mb-12 text-center md:text-[40px]">
             Dirancang Dengan Kontrol Penuh<br/>Atas Tabungan Anda
@@ -95,8 +96,19 @@ export default function Landing() {
               { id: '2.4', title: 'Riwayat Transaksi\nTransparan', desc: 'Semua aktivitas tercatat dan dapat ditinjau kapan saja.' },
             ].map((feature) => (
               <div key={feature.id} className="flex flex-col items-center">
-                <div className="flex items-center justify-center w-full h-[160px] bg-white/5 border-2 border-dashed border-white/20 rounded-xl text-white/50 text-[20px]">
-                  Gambar {feature.id}
+                <div className="flex items-center justify-center w-full h-[160px] bg-gradient-to-b from-white/10 to-transparent border border-white/10 rounded-2xl shadow-sm mb-2 transition-transform hover:-translate-y-1">
+                  {feature.id === '2.1' && (
+                    <svg className="w-12 h-12 text-emerald-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                  )}
+                  {feature.id === '2.2' && (
+                    <svg className="w-12 h-12 text-blue-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" /></svg>
+                  )}
+                  {feature.id === '2.3' && (
+                    <svg className="w-12 h-12 text-purple-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  )}
+                  {feature.id === '2.4' && (
+                    <svg className="w-12 h-12 text-orange-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  )}
                 </div>
                 <h3 className="font-['Inter',_sans-serif] font-normal text-[22px] leading-[1.3] m-0 mt-5 mb-3 whitespace-pre-line">
                   {feature.title}
@@ -109,17 +121,40 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* App Showcase Section */}
         <section className="flex justify-center py-[80px] px-[10%] bg-[#262d27] animate-fade-in">
           <div className="w-full max-w-[1000px]">
-             <div className="flex items-center justify-center w-full h-[600px] bg-white/5 border-2 border-dashed border-white/20 rounded-xl text-white/50 text-[24px]">
-               Mockup Halaman Dashboard (image-50)
-             </div>
+              <div className="flex flex-col items-center justify-center w-full h-[600px] bg-[#1a1f1b] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden relative">
+                <div className="absolute top-0 left-0 right-0 h-10 border-b border-white/10 bg-[#262d27] flex items-center px-4 gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                </div>
+                <div className="w-full h-full mt-10 p-8 grid grid-cols-[200px_1fr] gap-6 opacity-30">
+                  <div className="flex flex-col gap-4">
+                    <div className="h-8 bg-white/20 rounded"></div>
+                    <div className="h-4 bg-white/10 rounded w-3/4"></div>
+                    <div className="h-4 bg-white/10 rounded w-1/2"></div>
+                    <div className="h-4 bg-white/10 rounded w-2/3"></div>
+                  </div>
+                  <div className="flex flex-col gap-6">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="h-24 bg-emerald-500/40 rounded-xl"></div>
+                      <div className="h-24 bg-blue-500/40 rounded-xl"></div>
+                      <div className="h-24 bg-red-500/40 rounded-xl"></div>
+                    </div>
+                    <div className="h-64 bg-white/10 rounded-xl"></div>
+                  </div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="bg-black/40 text-white px-6 py-3 rounded-full backdrop-blur-md border border-white/10 font-medium tracking-wide">
+                    Live Dashboard Preview
+                  </span>
+                </div>
+              </div>
           </div>
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="w-full w-full bg-[#3e6945]/70 shadow-lg border-t border-white/10">
         <div className="max-w-[1200px] mx-auto px-6 py-8 md:px-10 relative overflow-hidden">
           

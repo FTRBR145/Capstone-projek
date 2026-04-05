@@ -52,29 +52,43 @@ export default function Navbar({ onMenuToggle }) {
 
       <div className="relative" ref={dropdownRef}>
         <div 
-          className="flex items-center justify-center bg-[#c1d3c1] rounded-full w-[50px] h-[50px] transition-transform duration-200 hover:scale-105 cursor-pointer" 
+          className="flex items-center justify-center shrink-0 bg-[#f3f4f6] rounded-full w-[50px] h-[50px] transition-transform duration-200 hover:scale-105 cursor-pointer overflow-hidden border border-white/10" 
           onClick={() => setDropdownOpen(!dropdownOpen)}
         >
-          <div className="flex items-center justify-center opacity-80">
-             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
+          {user?.avatar ? (
+             <img 
+               src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`} 
+               alt="Avatar" 
+               className="w-full h-full object-cover" 
+             />
+          ) : (
+             <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[120%] h-[120%] bg-[#f3f4f6] mt-2">
+                <circle cx="50" cy="35" r="22" fill="#9ca3af" />
+                <path d="M15 95 C 15 65, 85 65, 85 95" fill="#9ca3af" />
              </svg>
-          </div>
+          )}
         </div>
 
         {dropdownOpen && (
           <div className="absolute top-[calc(100%+10px)] right-0 w-[260px] bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-[slideInDown_0.2s_ease-out]">
             <div className="flex items-center gap-3 p-4">
-              <div className="flex items-center justify-center w-12 h-12 bg-[#c1d3c1] rounded-full opacity-80">
-                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                 </svg>
+              <div className="flex items-center justify-center shrink-0 w-12 h-12 bg-[#f3f4f6] rounded-full overflow-hidden border border-black/5">
+                {user?.avatar ? (
+                  <img 
+                    src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[120%] h-[120%] bg-[#f3f4f6] mt-2">
+                    <circle cx="50" cy="35" r="22" fill="#9ca3af" />
+                    <path d="M15 95 C 15 65, 85 65, 85 95" fill="#9ca3af" />
+                  </svg>
+                )}
               </div>
-              <div>
-                <div className="font-semibold text-[15px] text-black">{user?.name}</div>
-                <div className="text-[13px] text-[#666]">{user?.email}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-[15px] text-black truncate">{user?.name}</div>
+                <div className="text-[13px] text-[#666] truncate">{user?.email}</div>
               </div>
             </div>
             

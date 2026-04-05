@@ -1,6 +1,3 @@
-/**
- * Format Rupiah
- */
 export function formatRupiah(amount) {
   if (amount === undefined || amount === null) return '0'
   
@@ -18,7 +15,6 @@ export function formatRupiahWithSymbol(amount) {
   return prefix + formatted
 }
 
-// PERBAIKAN: Tambahkan variable formatted
 export function formatRupiahCompact(amount) {
   if (amount === undefined || amount === null) return 'Rp 0'
   
@@ -39,18 +35,12 @@ export function formatRupiahCompact(amount) {
   return prefix + formatted
 }
 
-/**
- * Format date DD/MM/YY
- */
 export function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
   return d.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
 
-/**
- * Format tanggal Indonesia
- */
 export function formatDateFull(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
@@ -65,9 +55,6 @@ export function getGreeting() {
   return 'Selamat Malam'
 }
 
-/**
- * Nama Bulan
- */
 export function getMonthName(monthIndex) {
   const months = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -76,9 +63,6 @@ export function getMonthName(monthIndex) {
   return months[monthIndex]
 }
 
-/**
- * Generate bulan untuk dropdown
- */
 export function getMonthOptions(year) {
   const months = []
   for (let i = 0; i < 12; i++) {
@@ -90,9 +74,6 @@ export function getMonthOptions(year) {
   return months
 }
 
-/**
- * Hari ini YYYY-MM-DD
- */
 export function getTodayISO() {
   return new Date().toISOString().split('T')[0]
 }

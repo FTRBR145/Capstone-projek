@@ -2,12 +2,15 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const { validate, authValidations } = require('../middleware/validationMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 const {
   register,
   login,
   googleAuth,
   getProfile,
   updateProfile,
+  uploadAvatar,
+  deleteAvatar,
   changePassword,
   deleteAccount
 } = require('../controllers/authController');
@@ -21,6 +24,8 @@ router.post('/google', googleAuth);
 router.use(protect);
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
+router.post('/profile/avatar', upload.single('avatar'), uploadAvatar);
+router.delete('/profile/avatar', deleteAvatar);
 router.put('/password', changePassword);
 router.delete('/account', deleteAccount);
 

@@ -49,8 +49,11 @@ class Transaction {
     const values = [];
 
     for (const [key, value] of Object.entries(updates)) {
-      if (allowedUpdates.includes(key) && value !== undefined) {
-        fields.push(`${key} = ?`);
+      let dbKey = key;
+      if (key === 'transactionDate') dbKey = 'transaction_date';
+
+      if (allowedUpdates.includes(dbKey) && value !== undefined) {
+        fields.push(`${dbKey} = ?`);
         values.push(value);
       }
     }

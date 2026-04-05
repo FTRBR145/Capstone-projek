@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* Custom Scrollbar*/
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -38,7 +37,6 @@
   from { width: 0; }
 }
 
-/* Toast Animation - PASTIKAN INI ADA */
 @keyframes toastSlideIn {
   from { 
     transform: translateX(100%); 

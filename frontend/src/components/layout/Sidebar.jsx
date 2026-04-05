@@ -29,7 +29,6 @@ export default function Sidebar({ isOpen, onClose }) {
 
   return (
     <>
-      {/* Overlay on mobile */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[89] min-[901px]:hidden" 
@@ -53,7 +52,6 @@ export default function Sidebar({ isOpen, onClose }) {
           </div>
           
           <nav className="flex flex-col gap-5 flex-1 px-[30px]">
-            {/* Mobile Close Button */}
             <div className="flex justify-between items-center pb-4 mb-2 border-b border-white/10 min-[901px]:hidden">
               <span className="font-['Inter',_sans-serif] font-semibold text-[16px] text-white">Menu</span>
               <button className="bg-transparent border-none text-[18px] text-white px-2 py-1 cursor-pointer" onClick={onClose}>✕</button>

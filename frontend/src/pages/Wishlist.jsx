@@ -7,6 +7,30 @@ import Modal from "../components/ui/Modal";
 import Footer from "../components/layout/Footer";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 
+const formatRupiahInput = (value) => {
+  if (!value) return "";
+
+  // Hanya ambil angka
+  const number = value.toString().replace(/[^,\d]/g, "");
+  const split = number.split(",");
+  let sisa = split[0].length % 3;
+  let rupiah = split[0].substr(0, sisa);
+  const ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+
+  if (ribuan) {
+    const separator = sisa ? "." : "";
+    rupiah += separator + ribuan.join(".");
+  }
+
+  rupiah = split[1] !== undefined ? rupiah + "," + split[1] : rupiah;
+  return rupiah;
+};
+
+const parseRupiahToNumber = (rupiahString) => {
+  if (!rupiahString) return 0;
+  return parseInt(rupiahString.replace(/[^,\d]/g, "")) || 0;
+};
+
 export default function Wishlist() {
   const toast = useToast();
 
@@ -23,6 +47,8 @@ export default function Wishlist() {
     targetAmount: "",
     savedAmount: "",
   });
+  const [targetAmountDisplay, setTargetAmountDisplay] = useState("");
+  const [savedAmountDisplay, setSavedAmountDisplay] = useState("");
 
   useEffect(() => {
     fetchAllData();
@@ -69,6 +95,8 @@ export default function Wishlist() {
       targetAmount: "",
       savedAmount: "0",
     });
+    setTargetAmountDisplay("");
+    setSavedAmountDisplay("");
     setModalOpen(true);
   };
 
@@ -76,10 +104,32 @@ export default function Wishlist() {
     setEditItem(item);
     setFormData({
       name: item.name,
-      targetAmount: item.target_amount,
-      savedAmount: item.saved_amount,
+      targetAmount: item.target_amount.toString(),
+      savedAmount: item.saved_amount.toString(),
     });
+    setTargetAmountDisplay(formatRupiahInput(item.target_amount.toString()));
+    setSavedAmountDisplay(formatRupiahInput(item.saved_amount.toString()));
     setModalOpen(true);
+  };
+
+  // Handler untuk input target amount
+  const handleTargetAmountChange = (e) => {
+    const rawValue = e.target.value;
+    const formatted = formatRupiahInput(rawValue);
+    const numericValue = parseRupiahToNumber(formatted);
+
+    setTargetAmountDisplay(formatted);
+    setFormData({ ...formData, targetAmount: numericValue.toString() });
+  };
+
+  // Handler untuk input saved amount
+  const handleSavedAmountChange = (e) => {
+    const rawValue = e.target.value;
+    const formatted = formatRupiahInput(rawValue);
+    const numericValue = parseRupiahToNumber(formatted);
+
+    setSavedAmountDisplay(formatted);
+    setFormData({ ...formData, savedAmount: numericValue.toString() });
   };
 
   const handleSubmit = async (e) => {
@@ -152,7 +202,6 @@ export default function Wishlist() {
 
   return (
     <div className="text-white p-6">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Wishlist Saya</h2>
         <button
@@ -163,24 +212,21 @@ export default function Wishlist() {
         </button>
       </div>
 
-      {/* Saldo Info */}
       <div className="bg-emerald-600 rounded-xl p-4 mb-6">
         <p className="text-sm opacity-90">Saldo Tersedia</p>
         <p className="text-2xl font-bold">Rp {formatRupiah(summary.saldo)}</p>
       </div>
 
-      {/* Search */}
       <div className="mb-6">
         <input
           type="text"
           placeholder="Cari wishlist..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
+          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
         />
       </div>
 
-      {/* Wishlist Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {wishlists.length === 0 ? (
           <div className="col-span-full text-center py-12 text-gray-400">
@@ -199,7 +245,6 @@ export default function Wishlist() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Target:</span>
-                    {/* PERBAIKAN: Hapus 'Rp' manual, pake fungsi formatRupiah aja */}
                     <span className="font-mono">
                       Rp {formatRupiah(item.target_amount)}
                     </span>
@@ -218,7 +263,6 @@ export default function Wishlist() {
                   </div>
                 </div>
 
-                {/* Progress Bar */}
                 <div className="mt-3">
                   <div className="flex justify-between text-xs mb-1">
                     <span>Progress</span>
@@ -242,7 +286,6 @@ export default function Wishlist() {
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex justify-end gap-2 mt-4">
                   <button
                     onClick={() => openEditModal(item)}
@@ -263,7 +306,6 @@ export default function Wishlist() {
         )}
       </div>
 
-      {/* Modal */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -280,7 +322,7 @@ export default function Wishlist() {
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
+              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
               placeholder="Contoh: Laptop Baru"
               required
             />
@@ -288,35 +330,41 @@ export default function Wishlist() {
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Target Nominal (Rp)
+              Target Nominal
             </label>
-            <input
-              type="number"
-              value={formData.targetAmount}
-              onChange={(e) =>
-                setFormData({ ...formData, targetAmount: e.target.value })
-              }
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
-              min="1"
-              required
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                Rp
+              </span>
+              <input
+                type="text"
+                value={targetAmountDisplay}
+                onChange={handleTargetAmountChange}
+                placeholder="0"
+                className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+                required
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Sudah Terkumpul (Rp)
+              Sudah Terkumpul
             </label>
-            <input
-              type="number"
-              value={formData.savedAmount}
-              onChange={(e) =>
-                setFormData({ ...formData, savedAmount: e.target.value })
-              }
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
-              min="0"
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                Rp
+              </span>
+              <input
+                type="text"
+                value={savedAmountDisplay}
+                onChange={handleSavedAmountChange}
+                placeholder="0"
+                className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
             <p className="text-xs text-gray-400 mt-1">
-              *Kosongi jika belum ada tabungan
+              Kosongi jika belum ada tabungan
             </p>
           </div>
 

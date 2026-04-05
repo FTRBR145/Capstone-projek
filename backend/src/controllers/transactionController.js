@@ -4,7 +4,7 @@ const createTransaction = async (req, res, next) => {
   try {
     const { type, amount, description, transactionDate } = req.body;
 
-    // Check if pengeluaran exceeds saldo
+    // Validate sufficient balance for outgoing transactions
     if (type === 'pengeluaran') {
       const summary = await Transaction.getSummary(req.user.id);
       if (amount > summary.saldo) {

@@ -13,7 +13,6 @@ export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  // States
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [summary, setSummary] = useState({
@@ -26,16 +25,12 @@ export default function Dashboard() {
     pengeluaran: []
   })
   const [wishlists, setWishlists] = useState([])
-  
-  // TAMBAHKAN INI - State untuk selected year
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
-  // Fetch all dashboard data
   useEffect(() => {
     fetchDashboardData()
-  }, [selectedYear]) // <-- selectedYear sebagai dependency
+  }, [selectedYear])
 
-  // TAMBAHKAN INI - Refresh periodik setiap 30 detik
   useEffect(() => {
     const interval = setInterval(() => {
       fetchDashboardData()
@@ -49,10 +44,9 @@ export default function Dashboard() {
     setError(null)
     
     try {
-      // Fetch all data in parallel
       const [summaryRes, chartRes, wishlistRes] = await Promise.all([
         transactionService.getSummary(),
-        transactionService.getChartData(selectedYear), // <-- pakai selectedYear
+        transactionService.getChartData(selectedYear),
         wishlistService.getWishlists()
       ])
 
@@ -78,7 +72,6 @@ export default function Dashboard() {
     return null
   }
 
-  // Hitung progress wishlist
   const calculateProgress = (saved, target) => {
     if (!target) return 0
     return Math.min(100, Math.round((saved / target) * 100))
@@ -109,51 +102,59 @@ export default function Dashboard() {
         Welcome back to Dashboard!
       </p>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Card Dana Offline */}
-        <div className="relative h-[150px] rounded-[20px] p-6 flex flex-col justify-center overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.2)] bg-[#739d34]">
-          <div className="relative z-[2] flex justify-between items-start mb-[10px]">
-            <span className="text-black text-[20px] font-['Inter',_sans-serif] font-medium">Dana Offline</span>
-            <span className="text-[28px] opacity-80 text-black">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="6" width="20" height="12" rx="2"></rect>
-                <circle cx="12" cy="12" r="2"></circle>
-                <path d="M6 12h.01M18 12h.01"></path>
+        <div className="relative h-[130px] rounded-2xl p-6 flex flex-col justify-center overflow-hidden shadow-lg bg-gradient-to-br from-emerald-600 to-emerald-700">
+          <div className="relative z-[2] flex justify-between items-start mb-2">
+            <span className="text-emerald-50 text-[15px] font-medium opacity-90">Total Saldo</span>
+            <span className="text-emerald-200/50">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="2" y="6" width="20" height="12" rx="2" strokeWidth={2}></rect>
+                <circle cx="12" cy="12" r="2" strokeWidth={2}></circle>
+                <path d="M6 12h.01M18 12h.01" strokeWidth={2}></path>
               </svg>
             </span>
           </div>
-          <div className="relative z-[2] text-black text-[30px] font-['Inter',_sans-serif] font-semibold">
+          <div className="relative z-[2] text-white text-[28px] md:text-[32px] font-bold">
             {formatRupiahCompact(summary.saldo)}
           </div>
-          <div className="absolute inset-0 bg-[linear-gradient(270deg,rgba(102,102,102,0.4)_0%,rgba(0,0,0,0.5)_100%),linear-gradient(to_left,#8cff00,#8cff00)] opacity-80 z-[1]"></div>
         </div>
-        
-        {/* Card Pengeluaran */}
-        <div className="relative h-[150px] rounded-[20px] p-6 flex flex-col justify-center overflow-hidden shadow-[0_4px_15px_rgba(0,0,0,0.2)] bg-[#999]">
-          <div className="relative z-[2] flex justify-between items-start mb-[10px]">
-            <span className="text-black text-[20px] font-['Inter',_sans-serif] font-medium">Pengeluaran</span>
-            <span className="text-[28px] opacity-80 text-black">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
-                <polyline points="17 18 23 18 23 12"></polyline>
+
+        <div className="relative h-[130px] rounded-2xl p-6 flex flex-col justify-center overflow-hidden shadow-lg bg-gradient-to-br from-blue-600 to-blue-700">
+          <div className="relative z-[2] flex justify-between items-start mb-2">
+            <span className="text-blue-50 text-[15px] font-medium opacity-90">Total Pemasukan</span>
+            <span className="text-blue-200/50">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" strokeWidth={2}></polyline>
+                <polyline points="17 6 23 6 23 12" strokeWidth={2}></polyline>
               </svg>
             </span>
           </div>
-          <div className="relative z-[2] text-black text-[30px] font-['Inter',_sans-serif] font-semibold">
+          <div className="relative z-[2] text-white text-[28px] md:text-[32px] font-bold">
+            {formatRupiahCompact(summary.pemasukan)}
+          </div>
+        </div>
+        
+        <div className="relative h-[130px] rounded-2xl p-6 flex flex-col justify-center overflow-hidden shadow-lg bg-gradient-to-br from-red-600 to-red-700">
+          <div className="relative z-[2] flex justify-between items-start mb-2">
+            <span className="text-red-50 text-[15px] font-medium opacity-90">Total Pengeluaran</span>
+            <span className="text-red-200/50">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" strokeWidth={2}></polyline>
+                <polyline points="17 18 23 18 23 12" strokeWidth={2}></polyline>
+              </svg>
+            </span>
+          </div>
+          <div className="relative z-[2] text-white text-[28px] md:text-[32px] font-bold">
             {formatRupiahCompact(summary.pengeluaran)}
           </div>
-          <div className="absolute inset-0 bg-[linear-gradient(270deg,rgba(102,102,102,0.4)_0%,rgba(0,0,0,0.5)_100%),linear-gradient(to_left,#ffffff,#ffffff)] opacity-80 z-[1]"></div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start mt-6">
         
-        {/* Charts Section */}
         <div className="flex flex-col gap-6">
 
-          {/* Pemasukan Chart */}
           <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 border border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] relative">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-['Inter',_sans-serif] text-[16px] font-medium text-white m-0">Pemasukan {selectedYear}</h3>
@@ -184,13 +185,12 @@ export default function Dashboard() {
                     tickFormatter={v => v >= 1000000 ? `${v/1000000}jt` : `${v/1000}k`} 
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                  <Bar dataKey="amount" fill="#d9d9d9" radius={[2, 2, 0, 0]} barSize={40} />
+                  <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} name="Pemasukan" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Pengeluaran Chart */}
           <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 border border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] relative">
             <div className="flex justify-between items-center mb-6">
               <h3 className="font-['Inter',_sans-serif] text-[16px] font-medium text-white m-0">Pengeluaran {selectedYear}</h3>
@@ -221,14 +221,13 @@ export default function Dashboard() {
                     tickFormatter={v => v >= 1000000 ? `${v/1000000}jt` : `${v/1000}k`} 
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                  <Bar dataKey="amount" fill="#d9d9d9" radius={[2, 2, 0, 0]} barSize={40} />
+                  <Bar dataKey="amount" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} name="Pengeluaran" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        {/* Wishlist Sidebar Section */}
         <div className="w-full">
           <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 border border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] relative h-[500px] lg:h-[850px] flex flex-col">
             <h3 className="font-['Inter',_sans-serif] text-[16px] font-medium text-white m-0 mb-4">Wishlist</h3>
@@ -253,34 +252,36 @@ export default function Dashboard() {
                 {wishlists.slice(0, 5).map(item => {
                   const progress = calculateProgress(item.saved_amount, item.target_amount)
                   return (
-                    <div key={item.id} className="bg-[#d9d9d9] rounded-[13px] p-4 text-black shrink-0">
-                      <h4 className="text-[14px] font-semibold m-0 mb-[10px] font-['Inter',_sans-serif]">{item.name}</h4>
-                      <div className="text-[11px] leading-[1.4] text-[#444]">
-                        <div>
-                          <span className="inline-block w-[60px] font-semibold text-[#333]">Target:</span> 
-                          <span>Rp {formatRupiahCompact(item.target_amount)}</span>
+                    <div key={item.id} className="bg-gray-800 rounded-xl p-4 text-white shrink-0 shadow-md">
+                      <h4 className="text-[15px] font-medium m-0 mb-3 font-['Inter',_sans-serif] text-white/90 truncate">{item.name}</h4>
+                      <div className="text-[13px] leading-relaxed text-white/60 space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span>Target:</span> 
+                          <span className="font-mono text-white/90">{formatRupiahCompact(item.target_amount)}</span>
                         </div>
-                        <div>
-                          <span className="inline-block w-[60px] font-semibold text-[#333]">Terkumpul:</span> 
-                          <span>Rp {formatRupiahCompact(item.saved_amount)}</span>
+                        <div className="flex justify-between items-center">
+                          <span>Terkumpul:</span> 
+                          <span className="font-mono text-emerald-400">{formatRupiahCompact(item.saved_amount)}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 text-[12px] mt-3">
-                        <span className="w-[60px]">Progress:</span>
-                        <div className="flex-1 h-[10px] bg-black/10 rounded-[4px] overflow-hidden">
+                      <div className="mt-4">
+                        <div className="flex justify-between text-[11px] mb-1.5">
+                          <span className="text-white/50">Progress</span>
+                          <span className="font-medium text-white/80">{progress}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden">
                           <div 
-                            className="h-full bg-[#39dc31] rounded-[4px]" 
+                            className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
                             style={{ width: `${progress}%` }}
-                          ></div>
+                          />
                         </div>
-                        <span className="text-[10px] font-medium w-[24px]">{progress}%</span>
                       </div>
-                      <div className="flex justify-between mt-3">
+                      <div className="flex justify-end mt-4">
                         <button 
-                          className="bg-transparent border-none text-[#333] text-[10px] cursor-pointer font-['Inter',_sans-serif] p-0 hover:underline" 
+                          className="bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 rounded-md px-4 py-1.5 text-[11px] cursor-pointer transition-colors font-medium hover:text-white" 
                           onClick={() => navigate('/wishlist')}
                         >
-                          [ Detail ]
+                          Detail
                         </button>
                       </div>
                     </div>

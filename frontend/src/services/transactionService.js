@@ -1,7 +1,6 @@
 import api from './api'
 
 export const transactionService = {
-  // Get all transactions with filters
   getTransactions: async (filters = {}) => {
     const params = new URLSearchParams()
     if (filters.type) params.append('type', filters.type)
@@ -13,32 +12,27 @@ export const transactionService = {
     return response.data
   },
 
-  // Create transaction
   createTransaction: async (data) => {
     const response = await api.post('/transactions', data)
     return response.data
   },
 
-  // Update transaction
   updateTransaction: async (id, data) => {
     const response = await api.put(`/transactions/${id}`, data)
     return response.data
   },
 
-  // Delete transaction
   deleteTransaction: async (id) => {
     const response = await api.delete(`/transactions/${id}`)
     return response.data
   },
 
-  // Get summary
   getSummary: async (month = null) => {
     const url = month ? `/transactions/summary?month=${month}` : '/transactions/summary'
     const response = await api.get(url)
     return response.data
   },
 
-  // Get chart data
   getChartData: async (year = null) => {
     const url = year ? `/transactions/chart?year=${year}` : '/transactions/chart'
     const response = await api.get(url)

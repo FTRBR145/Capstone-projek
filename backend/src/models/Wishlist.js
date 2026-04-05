@@ -32,17 +32,14 @@ class Wishlist {
 
   static async update(id, userId, updates) {
   try {
-    console.log('📦 MODEL UPDATE - Input:', { id, userId, updates });
-    
     const allowedUpdates = ['name', 'target_amount', 'saved_amount'];
     const fields = [];
     const values = [];
 
-    // Konversi camelCase ke snake_case jika perlu
+    // Convert to snake_case
     for (const [key, value] of Object.entries(updates)) {
       let dbKey = key;
       
-      // Mapping key
       if (key === 'targetAmount') dbKey = 'target_amount';
       if (key === 'savedAmount') dbKey = 'saved_amount';
       if (key === 'name') dbKey = 'name';
@@ -53,36 +50,23 @@ class Wishlist {
       }
     }
 
-    console.log('Fields to update:', fields);
-    console.log('Values:', values);
-
     if (fields.length === 0) {
-      console.log('No fields to update');
       return null;
     }
 
     values.push(id, userId);
     const query = `UPDATE wishlists SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`;
     
-    console.log('Query:', query);
-    console.log('Query values:', values);
-    
     const [result] = await pool.execute(query, values);
-    
-    console.log('Update result:', result);
 
     if (result.affectedRows === 0) {
-      console.log('No rows affected - wishlist not found or no changes');
       return null;
     }
 
-    // Ambil data yang sudah diupdate
     const updated = await this.findById(id);
-    console.log('Updated wishlist:', updated);
     
     return updated;
   } catch (error) {
-    console.error('Error in Wishlist.update:', error);
     throw error;
   }
 }

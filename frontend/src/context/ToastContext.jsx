@@ -9,7 +9,6 @@ export function ToastProvider({ children }) {
     const id = Date.now() + Math.random()
     setToasts(prev => [...prev, { id, message, type, duration }])
     
-    // Auto remove after duration
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
     }, duration)
@@ -26,7 +25,6 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={{ toasts, addToast, removeToast, success, error }}>
       {children}
       
-      {/* Toast Container - Pastini ini ada */}
       <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2">
         {toasts.map(toast => (
           <div

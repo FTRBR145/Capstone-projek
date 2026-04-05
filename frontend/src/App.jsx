@@ -18,12 +18,10 @@ function PrivateRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      {/* Public Routes */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
-      {/* Protected Routes */}
       <Route
         element={
           <PrivateRoute>
@@ -38,9 +36,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
       </Route>
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
-

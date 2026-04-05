@@ -7,23 +7,59 @@ import Modal from '../components/ui/Modal'
 import Footer from '../components/layout/Footer'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 
+// Fungsi format rupiah untuk input
+const formatRupiahInput = (value) => {
+  if (!value) return ''
+  
+  // Hanya ambil angka
+  const number = value.toString().replace(/[^,\d]/g, '')
+  const split = number.split(',')
+  let sisa = split[0].length % 3
+  let rupiah = split[0].substr(0, sisa)
+  const ribuan = split[0].substr(sisa).match(/\d{3}/gi)
+  
+  if (ribuan) {
+    const separator = sisa ? '.' : ''
+    rupiah += separator + ribuan.join('.')
+  }
+  
+  rupiah = split[1] !== undefined ? rupiah + ',' + split[1] : rupiah
+  return rupiah
+}
+
+// Fungsi parse dari format rupiah ke angka
+const parseRupiahToNumber = (rupiahString) => {
+  if (!rupiahString) return 0
+  return parseInt(rupiahString.replace(/[^,\d]/g, '')) || 0
+}
+
 export default function Saldo() {
   const toast = useToast()
   
-  // States
   const [loading, setLoading] = useState(true)
   const [pemasukan, setPemasukan] = useState([])
   const [pengeluaran, setPengeluaran] = useState([])
   const [summary, setSummary] = useState({ saldo: 0, pemasukan: 0, pengeluaran: 0 })
   const [wishlists, setWishlists] = useState([])
   
-  // Filter states
   const now = new Date()
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const [pemasukanMonth, setPemasukanMonth] = useState(currentMonth)
   const [pengeluaranMonth, setPengeluaranMonth] = useState(currentMonth)
   
-  // Modal states
+  // Pagination states
+  const [pemasukanPage, setPemasukanPage] = useState(1)
+  const [pengeluaranPage, setPengeluaranPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  
+  // Sorting states
+  const [pemasukanSort, setPemasukanSort] = useState({ column: 'transaction_date', direction: 'desc' })
+  const [pengeluaranSort, setPengeluaranSort] = useState({ column: 'transaction_date', direction: 'desc' })
+  
+  // Search states
+  const [searchPemasukan, setSearchPemasukan] = useState('')
+  const [searchPengeluaran, setSearchPengeluaran] = useState('')
+  
   const [modalOpen, setModalOpen] = useState(false)
   const [modalType, setModalType] = useState('pemasukan')
   const [editItem, setEditItem] = useState(null)
@@ -31,10 +67,19 @@ export default function Saldo() {
     date: getTodayISO(),
     amount: '',
     description: '',
-    wishlistId: '' // <-- TAMBAHKAN INI
+    wishlistId: ''
   })
+  const [amountDisplay, setAmountDisplay] = useState('')
 
-  // Fetch data
+  // Reset page when month or search changes
+  useEffect(() => {
+    setPemasukanPage(1)
+  }, [pemasukanMonth, searchPemasukan])
+
+  useEffect(() => {
+    setPengeluaranPage(1)
+  }, [pengeluaranMonth, searchPengeluaran])
+
   useEffect(() => {
     fetchAllData()
   }, [])
@@ -86,8 +131,9 @@ export default function Saldo() {
       date: getTodayISO(),
       amount: '',
       description: '',
-      wishlistId: '' // Reset wishlist
+      wishlistId: ''
     })
+    setAmountDisplay('')
     setModalOpen(true)
   }
 
@@ -96,14 +142,24 @@ export default function Saldo() {
     setEditItem(item)
     setFormData({
       date: item.transaction_date,
-      amount: item.amount,
+      amount: item.amount.toString(),
       description: item.description,
-      wishlistId: '' // Edit tidak update wishlist
+      wishlistId: ''
     })
+    setAmountDisplay(formatRupiahInput(item.amount.toString()))
     setModalOpen(true)
   }
 
-  // FUNGSI UPDATE WISHLIST MANUAL
+  // Handler untuk input nominal dengan format rupiah
+  const handleAmountChange = (e) => {
+    const rawValue = e.target.value
+    const formatted = formatRupiahInput(rawValue)
+    const numericValue = parseRupiahToNumber(formatted)
+    
+    setAmountDisplay(formatted)
+    setFormData({ ...formData, amount: numericValue.toString() })
+  }
+
   const updateWishlistManually = async (wishlistId, type, amount) => {
     if (!wishlistId) return null
     
@@ -150,7 +206,6 @@ export default function Saldo() {
       return
     }
 
-    // Validasi saldo untuk pengeluaran baru
     if (modalType === 'pengeluaran' && !editItem && amount > summary.saldo) {
       toast.error('Saldo tidak cukup!')
       return
@@ -166,15 +221,12 @@ export default function Saldo() {
       }
 
       if (editItem) {
-        // UPDATE: Edit transaksi
         await transactionService.updateTransaction(editItem.id, data)
         toast.success(`${modalType} berhasil diupdate`)
       } else {
-        // CREATE: Tambah transaksi baru
-        const transactionRes = await transactionService.createTransaction(data)
+        await transactionService.createTransaction(data)
         toast.success(`${modalType} berhasil ditambahkan`)
         
-        // *** UPDATE WISHLIST MANUAL jika dipilih ***
         if (formData.wishlistId) {
           try {
             const result = await updateWishlistManually(
@@ -185,7 +237,7 @@ export default function Saldo() {
             
             if (result) {
               toast.success(
-                `✨ Tabungan "${result.name}" terupdate: ` +
+                `Tabungan "${result.name}" terupdate: ` +
                 `Rp ${formatRupiah(result.oldAmount)} → Rp ${formatRupiah(result.newAmount)}`
               )
             }
@@ -196,8 +248,8 @@ export default function Saldo() {
       }
 
       setModalOpen(false)
-      await fetchAllData() // Refresh data
-      await fetchWishlists() // Refresh wishlists
+      await fetchAllData()
+      await fetchWishlists()
       
     } catch (error) {
       toast.error(error.response?.data?.message || 'Gagal menyimpan')
@@ -230,7 +282,6 @@ export default function Saldo() {
     }
   }
 
-  // Generate opsi bulan
   const monthOptions = () => {
     const options = []
     for (let i = 0; i < 6; i++) {
@@ -248,77 +299,232 @@ export default function Saldo() {
     return options
   }
 
-  // Render tabel transaksi
-  const renderTable = (data, type, selectedMonth, setMonth) => (
-    <div className="bg-[#555555] rounded-[18px] p-6 shadow-lg mt-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-medium text-white capitalize">{type}</h3>
-        <div className="flex gap-2">
-          <button
-            onClick={() => openAddModal(type)}
-            className="bg-emerald-600 text-white px-3 py-1 rounded-full hover:bg-emerald-700 transition"
-          >
-            + Tambah
-          </button>
-          <select
-            value={selectedMonth}
-            onChange={(e) => setMonth(e.target.value)}
-            className="bg-gray-700 text-white px-3 py-1 rounded-lg"
-          >
-            {monthOptions().map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+  // Fungsi sorting
+  const sortData = (data, sortConfig) => {
+    if (!sortConfig.column) return data
+    
+    return [...data].sort((a, b) => {
+      let aVal = a[sortConfig.column]
+      let bVal = b[sortConfig.column]
+      
+      if (sortConfig.column === 'transaction_date') {
+        aVal = new Date(aVal)
+        bVal = new Date(bVal)
+      }
+      
+      if (sortConfig.column === 'amount') {
+        aVal = Number(aVal)
+        bVal = Number(bVal)
+      }
+      
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+  }
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-white">
-          <thead className="bg-gray-700">
-            <tr>
-              <th className="p-3 text-left">Tanggal</th>
-              <th className="p-3 text-right">Nominal</th>
-              <th className="p-3 text-left">Keterangan</th>
-              <th className="p-3 text-center">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.length === 0 ? (
+  // Fungsi filter search
+  const filterData = (data, search) => {
+    if (!search) return data
+    return data.filter(item => 
+      item.description.toLowerCase().includes(search.toLowerCase())
+    )
+  }
+
+  // Fungsi pagination
+  const paginateData = (data, page, rowsPerPageValue) => {
+    const start = (page - 1) * rowsPerPageValue
+    const end = start + rowsPerPageValue
+    return data.slice(start, end)
+  }
+
+  // Render header dengan sorting
+  const renderSortHeader = (label, column, sortConfig, setSortConfig) => {
+    const isActive = sortConfig.column === column
+    return (
+      <th 
+        className="p-3 text-left cursor-pointer hover:bg-gray-600 transition select-none"
+        onClick={() => {
+          if (isActive) {
+            setSortConfig({
+              column,
+              direction: sortConfig.direction === 'asc' ? 'desc' : 'asc'
+            })
+          } else {
+            setSortConfig({ column, direction: 'asc' })
+          }
+        }}
+      >
+        <div className="flex items-center gap-1">
+          {label}
+          {isActive && (
+            <span className="text-xs">
+              {sortConfig.direction === 'asc' ? '↑' : '↓'}
+            </span>
+          )}
+        </div>
+      </th>
+    )
+  }
+
+  // Komponen Table
+  const TableSection = ({ 
+    data, 
+    type, 
+    selectedMonth, 
+    setMonth,
+    page, 
+    setPage, 
+    sortConfig, 
+    setSortConfig, 
+    search, 
+    setSearch 
+  }) => {
+    const filtered = filterData(data, search)
+    const sorted = sortData(filtered, sortConfig)
+    const totalItems = sorted.length
+    const totalPages = Math.ceil(totalItems / rowsPerPage)
+    const paginatedData = paginateData(sorted, page, rowsPerPage)
+    
+    return (
+      <div className="bg-[#555555] rounded-[18px] p-6 shadow-lg mt-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+          <h3 className="text-xl font-medium text-white capitalize">{type}</h3>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => openAddModal(type)}
+              className="bg-emerald-600 text-white px-3 py-1 rounded-full hover:bg-emerald-700 transition"
+            >
+              + Tambah
+            </button>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setMonth(e.target.value)}
+              className="bg-gray-700 text-white px-3 py-1 rounded-lg"
+            >
+              {monthOptions().map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder={`Cari ${type}...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full md:w-64 bg-gray-700 text-white rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-white">
+            <thead className="bg-gray-700">
               <tr>
-                <td colSpan="4" className="text-center p-8 text-gray-400">
-                  Belum ada data {type}
-                </td>
+                {renderSortHeader('Tanggal', 'transaction_date', sortConfig, setSortConfig)}
+                {renderSortHeader('Nominal', 'amount', sortConfig, setSortConfig)}
+                {renderSortHeader('Keterangan', 'description', sortConfig, setSortConfig)}
+                <th className="p-3 text-center">Aksi</th>
               </tr>
-            ) : (
-              data.map(item => (
-                <tr key={item.id} className="border-b border-gray-700">
-                  <td className="p-3">{formatDate(item.transaction_date)}</td>
-                  <td className="p-3 text-right font-mono">
-                    Rp {formatRupiah(item.amount)}
-                  </td>
-                  <td className="p-3">{item.description}</td>
-                  <td className="p-3 text-center">
-                    <button
-                      onClick={() => openEditModal(type, item)}
-                      className="text-blue-400 hover:text-blue-300 mr-2 transition"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(type, item.id)}
-                      className="text-red-400 hover:text-red-300 transition"
-                    >
-                      Hapus
-                    </button>
+            </thead>
+            <tbody>
+              {paginatedData.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="text-center p-8 text-gray-400">
+                    Belum ada data {type}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                paginatedData.map(item => (
+                  <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-600 transition">
+                    <td className="p-3">{formatDate(item.transaction_date)}</td>
+                    <td className="p-3 font-mono">
+                      Rp {formatRupiah(item.amount)}
+                    </td>
+                    <td className="p-3">{item.description}</td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => openEditModal(type, item)}
+                        className="text-blue-400 hover:text-blue-300 mr-2 transition"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(type, item.id)}
+                        className="text-red-400 hover:text-red-300 transition"
+                      >
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        
+        {totalItems > 0 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 pt-4 border-t border-gray-600">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-300">Baris per halaman:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value))
+                  setPage(1)
+                }}
+                className="bg-gray-700 text-white rounded px-2 py-1 text-sm"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+                className="px-2 py-1 bg-gray-700 rounded disabled:opacity-50 hover:bg-gray-600 transition"
+              >
+                «
+              </button>
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+                className="px-2 py-1 bg-gray-700 rounded disabled:opacity-50 hover:bg-gray-600 transition"
+              >
+                ‹
+              </button>
+              <span className="text-sm">
+                Halaman {page} dari {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page === totalPages}
+                className="px-2 py-1 bg-gray-700 rounded disabled:opacity-50 hover:bg-gray-600 transition"
+              >
+                ›
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
+                className="px-2 py-1 bg-gray-700 rounded disabled:opacity-50 hover:bg-gray-600 transition"
+              >
+                »
+              </button>
+            </div>
+            
+            <div className="text-sm text-gray-300">
+              Menampilkan {((page-1) * rowsPerPage) + 1} - {Math.min(page * rowsPerPage, totalItems)} dari {totalItems} data
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  )
+    )
+  }
 
   if (loading && !modalOpen) {
     return <LoadingSpinner />
@@ -343,10 +549,33 @@ export default function Saldo() {
       </div>
 
       {/* Tables */}
-      {renderTable(pemasukan, 'pemasukan', pemasukanMonth, setPemasukanMonth)}
-      {renderTable(pengeluaran, 'pengeluaran', pengeluaranMonth, setPengeluaranMonth)}
+      <TableSection
+        data={pemasukan}
+        type="pemasukan"
+        selectedMonth={pemasukanMonth}
+        setMonth={setPemasukanMonth}
+        page={pemasukanPage}
+        setPage={setPemasukanPage}
+        sortConfig={pemasukanSort}
+        setSortConfig={setPemasukanSort}
+        search={searchPemasukan}
+        setSearch={setSearchPemasukan}
+      />
+      
+      <TableSection
+        data={pengeluaran}
+        type="pengeluaran"
+        selectedMonth={pengeluaranMonth}
+        setMonth={setPengeluaranMonth}
+        page={pengeluaranPage}
+        setPage={setPengeluaranPage}
+        sortConfig={pengeluaranSort}
+        setSortConfig={setPengeluaranSort}
+        search={searchPengeluaran}
+        setSearch={setSearchPengeluaran}
+      />
 
-      {/* Modal Form */}
+      {/* Modal */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
@@ -368,19 +597,23 @@ export default function Saldo() {
           
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Nominal (Rp)
+              Nominal
             </label>
-            <input
-              type="number"
-              value={formData.amount}
-              onChange={(e) => setFormData({...formData, amount: e.target.value})}
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
-              min="1"
-              required
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                Rp
+              </span>
+              <input
+                type="text"
+                value={amountDisplay}
+                onChange={handleAmountChange}
+                placeholder="0"
+                className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
+                required
+              />
+            </div>
           </div>
           
-          {/* TAMBAHKAN DROPDOWN WISHLIST */}
           {!editItem && wishlists.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
@@ -399,7 +632,7 @@ export default function Saldo() {
                 ))}
               </select>
               <p className="text-xs text-gray-400 mt-1">
-                💡 Pilih wishlist untuk update tabungan otomatis
+                Pilih wishlist untuk update tabungan otomatis
               </p>
             </div>
           )}

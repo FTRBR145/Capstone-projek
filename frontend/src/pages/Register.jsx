@@ -82,7 +82,6 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center relative bg-[#101010] overflow-hidden font-['Inter',_sans-serif]">
       
-      {/* Background and Overlays */}
       <div className="absolute inset-0 bg-[#1a221f] flex items-center justify-center z-[1]">
         <div className="text-white/20 text-[24px] border-2 border-dashed border-white/20 py-5 px-10 rounded-xl">
           Background Image Placeholder (image-bg0.png)
@@ -92,10 +91,8 @@ export default function Register() {
       <div className="absolute inset-0 z-[2] backdrop-blur-[2px] bg-[linear-gradient(180deg,rgba(0,0,0,0.2)_0%,rgba(140,255,0,0.1)_100%),linear-gradient(to_left,rgba(16,16,16,0.8),rgba(16,16,16,0.8))]"></div>
       <div className="absolute inset-0 z-[3] bg-[radial-gradient(closest-side,rgba(255,255,255,0.1)_10%,rgba(255,255,255,0)_100%)]"></div>
       
-      {/* Container */}
       <div className="relative z-10 w-full max-w-[90%] min-[577px]:max-w-[420px] bg-[#525050]/60 rounded-2xl py-[30px] px-6 min-[577px]:py-10 min-[577px]:px-10 shadow-[0_10px_40px_rgba(0,0,0,0.5)] backdrop-blur-[10px] border border-white/10 animate-scale-in">
         
-        {/* TAMBAHKAN TOMBOL CLOSE / BACK */}
         <button 
           onClick={() => navigate('/')}
           className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
@@ -107,7 +104,6 @@ export default function Register() {
           </svg>
         </button>
 
-        {/* Logo yang bisa diklik */}
         <h1 
           className="font-bold text-[40px] min-[577px]:text-[48px] text-white text-center m-0 mb-2.5 leading-none cursor-pointer hover:text-emerald-400 transition-colors font-['Inter',_sans-serif]" 
           onClick={() => navigate('/')}
@@ -164,7 +160,6 @@ export default function Register() {
             <div className="h-px bg-white/60 w-full mt-1"></div>
           </div>
 
-          {/* reCAPTCHA v2 Real */}
           <div className="mt-6 flex justify-start">
             <ReCAPTCHA
               ref={recaptchaRef}
@@ -184,7 +179,6 @@ export default function Register() {
         </form>
 
         <div className="relative mt-4">
-          {/* Hidden GoogleLogin button */}
           <div ref={googleBtnRef} className="absolute opacity-0 pointer-events-none w-full">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
@@ -192,7 +186,6 @@ export default function Register() {
               width="100%"
             />
           </div>
-          {/* Custom styled button */}
           <button
             type="button"
             className="w-full bg-[#e0e0e0] text-[#333] border-none p-3 text-[16px] font-medium rounded cursor-pointer flex items-center justify-center gap-2.5 transition-colors duration-200 hover:bg-[#d0d0d0] font-['Inter',_sans-serif] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -209,7 +202,6 @@ export default function Register() {
           </button>
         </div>
 
-        {/* Link ke Login dan Home */}
         <div className="flex justify-between items-center mt-8 text-white text-[14px] font-['Inter',_sans-serif]">
           <Link to="/login" className="text-[#00b2ff] no-underline hover:underline">
             Sudah punya akun? Login

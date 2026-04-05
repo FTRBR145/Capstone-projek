@@ -38,14 +38,9 @@ const getWishlists = async (req, res, next) => {
 const updateWishlist = async (req, res, next) => {
   try {
     const { id } = req.params;
-    console.log('🔵 UPDATE WISHLIST REQUEST:');
-    console.log('ID:', id);
-    console.log('User ID:', req.user.id);
-    console.log('Request body:', req.body);
-    
     const updates = req.body;
 
-    // Validasi data
+    // Prevent updating with an empty payload
     if (!updates || Object.keys(updates).length === 0) {
       return res.status(400).json({
         success: false,
@@ -56,21 +51,18 @@ const updateWishlist = async (req, res, next) => {
     const wishlist = await Wishlist.update(id, req.user.id, updates);
 
     if (!wishlist) {
-      console.log('❌ Wishlist not found or update failed');
       return res.status(404).json({
         success: false,
         message: 'Wishlist tidak ditemukan'
       });
     }
 
-    console.log('✅ Wishlist updated successfully:', wishlist);
     res.json({
       success: true,
       message: 'Wishlist berhasil diupdate',
       data: wishlist
     });
   } catch (error) {
-    console.error('❌ Error updating wishlist:', error);
     next(error);
   }
 };
@@ -139,4 +131,3 @@ module.exports = {
   getProgress,
   getSummary
 };
-
