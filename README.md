@@ -251,7 +251,7 @@ VITE v4.x.x  ready in xxx ms
 - Centang captcha
 - Klik "Login"
 
-### **3. Dashboard**
+### **3. Dashboard**    
 - Lihat ringkasan saldo
 - Grafik pemasukan/pengeluaran
 - Preview wishlist

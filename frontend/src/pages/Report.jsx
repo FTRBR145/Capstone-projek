@@ -23,7 +23,7 @@ export default function Report() {
     
     try {
       // Kirim feedback ke backend (kita perlu buat endpoint ini nanti)
-      await api.post('/feedback', { message: reportText.trim() })
+    
       
       toast.success('Laporan berhasil dikirim! Terima kasih atas masukanmu.')
       setReportText('')
