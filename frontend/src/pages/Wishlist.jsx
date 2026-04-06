@@ -7,6 +7,30 @@ import Modal from "../components/ui/Modal";
 import Footer from "../components/layout/Footer";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
 
+const formatRupiahInput = (value) => {
+  if (!value) return "";
+
+  // Hanya ambil angka
+  const number = value.toString().replace(/[^,\d]/g, "");
+  const split = number.split(",");
+  let sisa = split[0].length % 3;
+  let rupiah = split[0].substr(0, sisa);
+  const ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+
+  if (ribuan) {
+    const separator = sisa ? "." : "";
+    rupiah += separator + ribuan.join(".");
+  }
+
+  rupiah = split[1] !== undefined ? rupiah + "," + split[1] : rupiah;
+  return rupiah;
+};
+
+const parseRupiahToNumber = (rupiahString) => {
+  if (!rupiahString) return 0;
+  return parseInt(rupiahString.replace(/[^,\d]/g, "")) || 0;
+};
+
 export default function Wishlist() {
   const toast = useToast();
 
@@ -15,6 +39,7 @@ export default function Wishlist() {
   const [summary, setSummary] = useState({ saldo: 0 });
   const [search, setSearch] = useState("");
 
+  // Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [formData, setFormData] = useState({
@@ -22,6 +47,8 @@ export default function Wishlist() {
     targetAmount: "",
     savedAmount: "",
   });
+  const [targetAmountDisplay, setTargetAmountDisplay] = useState("");
+  const [savedAmountDisplay, setSavedAmountDisplay] = useState("");
 
   useEffect(() => {
     fetchAllData();
@@ -68,6 +95,8 @@ export default function Wishlist() {
       targetAmount: "",
       savedAmount: "0",
     });
+    setTargetAmountDisplay("");
+    setSavedAmountDisplay("");
     setModalOpen(true);
   };
 
@@ -75,10 +104,32 @@ export default function Wishlist() {
     setEditItem(item);
     setFormData({
       name: item.name,
-      targetAmount: item.target_amount,
-      savedAmount: item.saved_amount,
+      targetAmount: item.target_amount.toString(),
+      savedAmount: item.saved_amount.toString(),
     });
+    setTargetAmountDisplay(formatRupiahInput(item.target_amount.toString()));
+    setSavedAmountDisplay(formatRupiahInput(item.saved_amount.toString()));
     setModalOpen(true);
+  };
+
+  // Handler untuk input target amount
+  const handleTargetAmountChange = (e) => {
+    const rawValue = e.target.value;
+    const formatted = formatRupiahInput(rawValue);
+    const numericValue = parseRupiahToNumber(formatted);
+
+    setTargetAmountDisplay(formatted);
+    setFormData({ ...formData, targetAmount: numericValue.toString() });
+  };
+
+  // Handler untuk input saved amount
+  const handleSavedAmountChange = (e) => {
+    const rawValue = e.target.value;
+    const formatted = formatRupiahInput(rawValue);
+    const numericValue = parseRupiahToNumber(formatted);
+
+    setSavedAmountDisplay(formatted);
+    setFormData({ ...formData, savedAmount: numericValue.toString() });
   };
 
   const handleSubmit = async (e) => {
@@ -172,7 +223,7 @@ export default function Wishlist() {
           placeholder="Cari wishlist..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2"
+          className="w-full bg-gray-700 text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500"
         />
       </div>
 
@@ -271,7 +322,7 @@ export default function Wishlist() {
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
+              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
               placeholder="Contoh: Laptop Baru"
               required
             />
@@ -279,35 +330,41 @@ export default function Wishlist() {
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Target Nominal (Rp)
+              Target Nominal
             </label>
-            <input
-              type="number"
-              value={formData.targetAmount}
-              onChange={(e) =>
-                setFormData({ ...formData, targetAmount: e.target.value })
-              }
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
-              min="1"
-              required
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                Rp
+              </span>
+              <input
+                type="text"
+                value={targetAmountDisplay}
+                onChange={handleTargetAmountChange}
+                placeholder="0"
+                className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+                required
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">
-              Sudah Terkumpul (Rp)
+              Sudah Terkumpul
             </label>
-            <input
-              type="number"
-              value={formData.savedAmount}
-              onChange={(e) =>
-                setFormData({ ...formData, savedAmount: e.target.value })
-              }
-              className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
-              min="0"
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                Rp
+              </span>
+              <input
+                type="text"
+                value={savedAmountDisplay}
+                onChange={handleSavedAmountChange}
+                placeholder="0"
+                className="w-full bg-gray-700 text-white rounded-lg pl-10 pr-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
             <p className="text-xs text-gray-400 mt-1">
-              *Kosongi jika belum ada tabungan
+              Kosongi jika belum ada tabungan
             </p>
           </div>
 
