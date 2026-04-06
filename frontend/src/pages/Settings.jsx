@@ -147,18 +147,11 @@ export default function Settings() {
           onClick={() => !loading.avatar && fileInputRef.current?.click()}
         >
           <div className="w-[100px] h-[100px] bg-[#e5e7eb] rounded-full flex items-center justify-center shadow-[0_0_0_6px_rgba(255,255,255,0.1)] overflow-hidden">
-            {user?.avatar ? (
-              <img 
-                src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`} 
-                alt="Avatar" 
-                className="w-full h-full object-cover" 
-              />
-            ) : (
-              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full bg-[#f3f4f6]">
-                <circle cx="50" cy="35" r="22" fill="#9ca3af" />
-                <path d="M15 95 C 15 65, 85 65, 85 95" fill="#9ca3af" />
-              </svg>
-            )}
+            <img 
+              src={user?.avatar ? (user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`) : '/default-avatar.png'} 
+              alt="Avatar" 
+              className="w-full h-full object-cover" 
+            />
           </div>
           
           <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">

@@ -477,8 +477,14 @@ export default function Report() {
                 <YAxis 
                   axisLine={true} 
                   tickLine={false} 
+                  allowDecimals={false}
                   tick={{ fill: 'white', fontSize: 12 }}
-                  tickFormatter={v => v >= 1000000 ? `${v/1000000}jt` : `${v/1000}k`}
+                  tickFormatter={(v) => {
+                    if (v === 0) return '0'
+                    if (v >= 1000000) return `${v / 1000000}jt`
+                    if (v >= 1000) return `${v / 1000}k`
+                    return v
+                  }}
                   label={{ value: 'Nominal (Rp)', angle: -90, position: 'insideLeft', fill: 'white' }}
                 />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
@@ -506,8 +512,14 @@ export default function Report() {
                   <YAxis 
                     axisLine={true} 
                     tickLine={false} 
+                    allowDecimals={false}
                     tick={{ fill: 'white', fontSize: 12 }}
-                    tickFormatter={v => v >= 1000000 ? `${v/1000000}jt` : `${v/1000}k`}
+                    tickFormatter={(v) => {
+                      if (v === 0) return '0'
+                      if (v >= 1000000) return `${v / 1000000}jt`
+                      if (v >= 1000) return `${v / 1000}k`
+                      return v
+                    }}
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                   <Bar 

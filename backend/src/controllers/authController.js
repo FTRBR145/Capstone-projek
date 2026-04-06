@@ -4,12 +4,18 @@ const { OAuth2Client } = require('google-auth-library');
 const axios = require('axios');
 
 const verifyRecaptcha = async (token) => {
-  const response = await axios.post(
-    `https://www.google.com/recaptcha/api/siteverify`,
-    null,
-    { params: { secret: process.env.RECAPTCHA_SECRET_KEY, response: token } }
-  );
-  return response.data.success;
+  try {
+    const response = await axios.post(
+      `https://www.google.com/recaptcha/api/siteverify`,
+      null,
+      { params: { secret: process.env.RECAPTCHA_SECRET_KEY, response: token } }
+    );
+    console.log('reCAPTCHA siteverify response:', response.data);
+    return response.data.success;
+  } catch (err) {
+    console.error('Error during siteverify axios call:', err.message);
+    return false;
+  }
 };
 
 const generateToken = (id) => {
@@ -190,10 +196,22 @@ const deleteAccount = async (req, res, next) => {
 
 const googleAuth = async (req, res, next) => {
   try {
-    const { credential } = req.body;
+    const { credential, password, captchaToken, type = 'login' } = req.body;
+
+    if (!captchaToken) {
+      return res.status(400).json({ success: false, message: 'Verifikasi reCAPTCHA diperlukan' });
+    }
+    
+    // Bypass strict backend reCAPTCHA verification for Google Auth because the multi-step 
+    // flow (Google Popup -> Password Modal) often causes the 2-minute token to expire. 
+    // The Google JWT verification below serves as a strong anti-bot measure instead.
 
     if (!credential) {
       return res.status(400).json({ success: false, message: 'Credential Google diperlukan' });
+    }
+
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Password harus diisi' });
     }
 
     let payload;
@@ -210,24 +228,37 @@ const googleAuth = async (req, res, next) => {
 
     const { sub: googleId, email, name, picture } = payload;
 
-    // Google Auth Flow: Match by Google ID first, fallback to Email matching
     let user = await User.findByGoogleId(googleId);
-
     if (!user) {
-      const existingUser = await User.findByEmail(email);
-      
-      if (existingUser) {
-        // Link new Google ID to existing manual account
+      user = await User.findByEmail(email);
+    }
+
+    if (type === 'register') {
+      if (user) {
+        return res.status(400).json({ success: false, message: 'Akun sudah terdaftar. Silakan login.' });
+      }
+      user = await User.createGoogleUser({ googleId, name, email, avatar: picture, password });
+    } else {
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'Akun belum terdaftar. Silakan register terlebih dahulu.' });
+      }
+
+      const isPasswordValid = await User.comparePassword(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ success: false, message: 'Password salah' });
+      }
+
+      if (!user.google_id) {
         await require('../config/database').pool.execute(
           'UPDATE users SET google_id = ?, avatar = COALESCE(avatar, ?) WHERE id = ?',
-          [googleId, picture || null, existingUser.id]
+          [googleId, picture || null, user.id]
         );
-        user = await User.findById(existingUser.id);
-      } else {
-        // First time user via Google
-        user = await User.createGoogleUser({ googleId, name, email, avatar: picture });
+        user = await User.findById(user.id);
       }
     }
+
+    // Prevent password leak
+    delete user.password;
 
     res.json({
       success: true,

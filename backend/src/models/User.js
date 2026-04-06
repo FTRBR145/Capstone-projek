@@ -66,16 +66,17 @@ class User {
 
   static async findByGoogleId(googleId) {
     const [rows] = await pool.execute(
-      'SELECT id, name, email, avatar, google_id, created_at FROM users WHERE google_id = ?',
+      'SELECT id, name, email, password, avatar, google_id, created_at FROM users WHERE google_id = ?',
       [googleId]
     );
     return rows[0];
   }
 
-  static async createGoogleUser({ googleId, name, email, avatar }) {
+  static async createGoogleUser({ googleId, name, email, avatar, password }) {
+    const hashedPassword = await bcrypt.hash(password, 10);
     const [result] = await pool.execute(
-      'INSERT INTO users (name, email, password, avatar, google_id) VALUES (?, ?, NULL, ?, ?)',
-      [name, email, avatar || null, googleId]
+      'INSERT INTO users (name, email, password, avatar, google_id) VALUES (?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, avatar || null, googleId]
     );
     return this.findById(result.insertId);
   }
