@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useEffect } from 'react'
+import dashboardImg from '../images/dashboard-preview.png'
 
 export default function Landing() {
   const navigate = useNavigate()
@@ -123,39 +124,27 @@ export default function Landing() {
 
         <section className="flex justify-center py-[80px] px-[10%] bg-[#262d27] animate-fade-in">
           <div className="w-full max-w-[1000px]">
-              <div className="flex flex-col items-center justify-center w-full h-[600px] bg-[#1a1f1b] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden relative">
-                <div className="absolute top-0 left-0 right-0 h-10 border-b border-white/10 bg-[#262d27] flex items-center px-4 gap-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
-                </div>
-                <div className="w-full h-full mt-10 p-8 grid grid-cols-[200px_1fr] gap-6 opacity-30">
-                  <div className="flex flex-col gap-4">
-                    <div className="h-8 bg-white/20 rounded"></div>
-                    <div className="h-4 bg-white/10 rounded w-3/4"></div>
-                    <div className="h-4 bg-white/10 rounded w-1/2"></div>
-                    <div className="h-4 bg-white/10 rounded w-2/3"></div>
-                  </div>
-                  <div className="flex flex-col gap-6">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="h-24 bg-emerald-500/40 rounded-xl"></div>
-                      <div className="h-24 bg-blue-500/40 rounded-xl"></div>
-                      <div className="h-24 bg-red-500/40 rounded-xl"></div>
-                    </div>
-                    <div className="h-64 bg-white/10 rounded-xl"></div>
-                  </div>
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="bg-black/40 text-white px-6 py-3 rounded-full backdrop-blur-md border border-white/10 font-medium tracking-wide">
-                    Live Dashboard Preview
-                  </span>
-                </div>
+            <div className="w-full flex flex-col bg-[#1a1f1b] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden relative group">
+              <div className="h-10 w-full border-b border-white/10 bg-[#262d27] flex items-center px-4 gap-2 z-10 shrink-0">
+                <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
               </div>
+
+              <div className="w-full relative overflow-hidden bg-[#1d251f]">
+                <img 
+                  src={dashboardImg} 
+                  alt="Preview TabunganQu Dashboard" 
+                  className="w-full h-auto block transition-transform duration-700 group-hover:scale-[1.03] opacity-90 group-hover:opacity-100"
+                />
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#1a1f1b] to-transparent pointer-events-none"></div>
+              </div>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="w-full w-full bg-[#3e6945]/70 shadow-lg border-t border-white/10">
+      <footer className="w-full bg-[#3e6945]/70 shadow-lg border-t border-white/10">
         <div className="max-w-[1200px] mx-auto px-6 py-8 md:px-10 relative overflow-hidden">
           
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-white/20 pb-5 mb-5 gap-4">

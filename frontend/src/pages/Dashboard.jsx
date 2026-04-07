@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { formatRupiahCompact } from '../utils/helpers'
+import { formatRupiah, formatRupiahCompact } from '../utils/helpers'
 import { transactionService } from '../services/transactionService'
 import { wishlistService } from '../services/wishlistService'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -65,7 +65,7 @@ export default function Dashboard() {
     if (active && payload && payload.length) {
       return (
         <div className="bg-[#2A2A2A] py-2 px-[14px] rounded-lg shadow-[0_4px_12px_rgba(0,0,0,0.5)] text-[12px] font-semibold text-white border border-white/10">
-          {formatRupiahCompact(payload[0].value)}
+          Rp {formatRupiah(payload[0].value)}
         </div>
       )
     }
@@ -116,7 +116,7 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="relative z-[2] text-white text-[28px] md:text-[32px] font-bold">
-            {formatRupiahCompact(summary.saldo)}
+            Rp {formatRupiah(summary.saldo)}
           </div>
         </div>
 
@@ -131,7 +131,7 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="relative z-[2] text-white text-[28px] md:text-[32px] font-bold">
-            {formatRupiahCompact(summary.pemasukan)}
+            Rp {formatRupiah(summary.pemasukan)}
           </div>
         </div>
         
@@ -146,7 +146,7 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="relative z-[2] text-white text-[28px] md:text-[32px] font-bold">
-            {formatRupiahCompact(summary.pengeluaran)}
+            Rp {formatRupiah(summary.pengeluaran)}
           </div>
         </div>
       </div>
@@ -180,9 +180,15 @@ export default function Dashboard() {
                   />
                   <YAxis 
                     axisLine={true} 
-                    tickLine={false} 
+                    tickLine={false}
+                    allowDecimals={false}
                     tick={{ fill: 'white', fontSize: 13, fontFamily: 'Inter' }} 
-                    tickFormatter={v => v >= 1000000 ? `${v/1000000}jt` : `${v/1000}k`} 
+                    tickFormatter={(v) => {
+                      if (v === 0) return '0'
+                      if (v >= 1000000) return `${v / 1000000}jt`
+                      if (v >= 1000) return `${v / 1000}k`
+                      return v
+                    }} 
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                   <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} name="Pemasukan" />
@@ -217,8 +223,14 @@ export default function Dashboard() {
                   <YAxis 
                     axisLine={true} 
                     tickLine={false} 
+                    allowDecimals={false}
                     tick={{ fill: 'white', fontSize: 13, fontFamily: 'Inter' }} 
-                    tickFormatter={v => v >= 1000000 ? `${v/1000000}jt` : `${v/1000}k`} 
+                    tickFormatter={(v) => {
+                      if (v === 0) return '0'
+                      if (v >= 1000000) return `${v / 1000000}jt`
+                      if (v >= 1000) return `${v / 1000}k`
+                      return v
+                    }} 
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                   <Bar dataKey="amount" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} name="Pengeluaran" />
@@ -257,11 +269,11 @@ export default function Dashboard() {
                       <div className="text-[13px] leading-relaxed text-white/60 space-y-1">
                         <div className="flex justify-between items-center">
                           <span>Target:</span> 
-                          <span className="font-mono text-white/90">{formatRupiahCompact(item.target_amount)}</span>
+                          <span className="font-mono text-white/90">Rp {formatRupiah(item.target_amount)}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span>Terkumpul:</span> 
-                          <span className="font-mono text-emerald-400">{formatRupiahCompact(item.saved_amount)}</span>
+                          <span className="font-mono text-emerald-400">Rp {formatRupiah(item.saved_amount)}</span>
                         </div>
                       </div>
                       <div className="mt-4">

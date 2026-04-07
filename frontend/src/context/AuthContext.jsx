@@ -91,9 +91,14 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const googleLogin = useCallback(async (credentialResponse) => {
+  const googleLogin = useCallback(async (credentialResponse, password, captchaToken, type = 'login') => {
     try {
-      const response = await api.post('/auth/google', { credential: credentialResponse.credential })
+      const response = await api.post('/auth/google', { 
+        credential: credentialResponse.credential,
+        password,
+        captchaToken,
+        type
+      })
       const { user, token } = response.data.data
 
       localStorage.setItem('tabunganqu_user', JSON.stringify(user))

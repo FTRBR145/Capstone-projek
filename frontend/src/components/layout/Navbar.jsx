@@ -55,36 +55,22 @@ export default function Navbar({ onMenuToggle }) {
           className="flex items-center justify-center shrink-0 bg-[#f3f4f6] rounded-full w-[50px] h-[50px] transition-transform duration-200 hover:scale-105 cursor-pointer overflow-hidden border border-white/10" 
           onClick={() => setDropdownOpen(!dropdownOpen)}
         >
-          {user?.avatar ? (
-             <img 
-               src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`} 
-               alt="Avatar" 
-               className="w-full h-full object-cover" 
-             />
-          ) : (
-             <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[120%] h-[120%] bg-[#f3f4f6] mt-2">
-                <circle cx="50" cy="35" r="22" fill="#9ca3af" />
-                <path d="M15 95 C 15 65, 85 65, 85 95" fill="#9ca3af" />
-             </svg>
-          )}
+          <img 
+            src={user?.avatar ? (user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`) : '/default-avatar.png'} 
+            alt="Avatar" 
+            className="w-full h-full object-cover" 
+          />
         </div>
 
         {dropdownOpen && (
           <div className="absolute top-[calc(100%+10px)] right-0 w-[260px] bg-white rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-[slideInDown_0.2s_ease-out]">
             <div className="flex items-center gap-3 p-4">
               <div className="flex items-center justify-center shrink-0 w-12 h-12 bg-[#f3f4f6] rounded-full overflow-hidden border border-black/5">
-                {user?.avatar ? (
-                  <img 
-                    src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`} 
-                    alt="Avatar" 
-                    className="w-full h-full object-cover" 
-                  />
-                ) : (
-                  <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[120%] h-[120%] bg-[#f3f4f6] mt-2">
-                    <circle cx="50" cy="35" r="22" fill="#9ca3af" />
-                    <path d="M15 95 C 15 65, 85 65, 85 95" fill="#9ca3af" />
-                  </svg>
-                )}
+                <img 
+                  src={user?.avatar ? (user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`) : '/default-avatar.png'} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover" 
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-[15px] text-black truncate">{user?.name}</div>

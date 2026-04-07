@@ -13,6 +13,10 @@ export default function Register() {
   const [captchaToken, setCaptchaToken] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [showGooglePasswordModal, setShowGooglePasswordModal] = useState(false)
+  const [googlePassword, setGooglePassword] = useState('')
+  const [pendingGoogleAuth, setPendingGoogleAuth] = useState(null)
+  
   const googleBtnRef = useRef(null)
   const recaptchaRef = useRef(null)
   
@@ -65,18 +69,51 @@ export default function Register() {
   }
 
   const handleGoogleSuccess = async (credentialResponse) => {
+    setPendingGoogleAuth(credentialResponse)
+    setShowGooglePasswordModal(true)
+  }
+
+  const handleGooglePasswordSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (!googlePassword) {
+      toast.error('Password harus diisi')
+      return
+    }
+
+    if (googlePassword.length < 6) {
+      toast.error('Password minimal 6 karakter')
+      return
+    }
+
     setIsGoogleLoading(true)
     try {
-      const result = await googleLogin(credentialResponse)
+      const result = await googleLogin(pendingGoogleAuth, googlePassword, captchaToken, 'register')
       if (result.success) {
         toast.success('Berhasil masuk dengan Google! 🎉')
+        setShowGooglePasswordModal(false)
+        setGooglePassword('')
+        setPendingGoogleAuth(null)
         setTimeout(() => navigate('/dashboard', { replace: true }), 500)
       } else {
         toast.error(result.message)
+        recaptchaRef.current?.reset()
+        setCaptchaToken(null)
+        setShowGooglePasswordModal(false)
+        setGooglePassword('')
+        setPendingGoogleAuth(null)
       }
     } finally {
       setIsGoogleLoading(false)
     }
+  }
+
+  const triggerGoogleLogin = () => {
+    if (!captchaToken) {
+      toast.error('Tolong selesaikan verifikasi reCAPTCHA terlebih dahulu')
+      return
+    }
+    googleBtnRef.current?.querySelector('div[role=button]')?.click()
   }
 
   return (
@@ -189,7 +226,7 @@ export default function Register() {
           <button
             type="button"
             className="w-full bg-[#e0e0e0] text-[#333] border-none p-3 text-[16px] font-medium rounded cursor-pointer flex items-center justify-center gap-2.5 transition-colors duration-200 hover:bg-[#d0d0d0] font-['Inter',_sans-serif] disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => googleBtnRef.current?.querySelector('div[role=button]')?.click()}
+            onClick={triggerGoogleLogin}
             disabled={isGoogleLoading}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -216,6 +253,63 @@ export default function Register() {
           </Link>
         </div>
       </div>
+
+      {/* Google Password Modal */}
+      {showGooglePasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/60 p-4 font-['Inter',_sans-serif]">
+          <div className="bg-[#1f2926] border border-white/10 p-8 rounded-2xl shadow-xl w-full max-w-md animate-scale-in">
+            <h3 className="text-xl font-bold text-white mb-2">Pilih Password Baru</h3>
+            <p className="text-white/70 text-sm mb-6">
+              Untuk mengamankan akun TabunganQu Anda, silakan buat password. 
+              Password ini tidak akan mengubah password Google Anda.
+            </p>
+            <form onSubmit={handleGooglePasswordSubmit}>
+              <div className="relative w-full mb-6">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Masukkan Password"
+                  value={googlePassword}
+                  onChange={(e) => setGooglePassword(e.target.value)}
+                  className="w-full bg-transparent border-b border-white/30 text-white text-[16px] py-2 pr-10 outline-none focus:border-emerald-400 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-0 top-2 text-white/50 hover:text-white transition-colors"
+                >
+                  {showPassword ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  )}
+                </button>
+              </div>
+              
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowGooglePasswordModal(false)
+                    setGooglePassword('')
+                    setPendingGoogleAuth(null)
+                  }}
+                  className="px-4 py-2 rounded font-medium text-white/70 hover:bg-white/10 transition-colors"
+                  disabled={isGoogleLoading}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isGoogleLoading}
+                  className="bg-[#28a745] hover:bg-[#218838] text-white px-5 py-2 rounded font-medium transition-colors disabled:opacity-50"
+                >
+                  {isGoogleLoading ? 'Menyimpan...' : 'Lanjutkan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
