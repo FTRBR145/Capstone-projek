@@ -169,12 +169,9 @@ export default function Saldo() {
     const currentSaved = wishlist.saved_amount
     let newSavedAmount
     
-    if (type === 'pemasukan') {
-      newSavedAmount = currentSaved + amount
-    } else {
-      newSavedAmount = Math.max(0, currentSaved - amount)
-    }
-    
+    // Saat user memilih hubungkan ke wishlist, baik itu dari Pemasukan maupun Pengeluaran,
+    // itu berarti user sedang MENAMBAH tabungannya ke wishlist tersebut.
+    newSavedAmount = currentSaved + amount
     try {
       await wishlistService.updateWishlist(wishlistId, {
         name: wishlist.name,
