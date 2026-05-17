@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { transactionService } from '../services/transactionService'
@@ -13,394 +13,218 @@ import { saveAs } from 'file-saver'
 import { DEBUG_MODE } from '../config/debugMode'
 import { DUMMY_SUMMARY, DUMMY_ALL_TRANSACTIONS, DUMMY_CHART } from '../data/dummyData'
 
+/* ─── Date range presets ─────────────────────────── */
+const getPreset = (key) => {
+  const now = new Date()
+  const iso = (d) => d.toISOString().split('T')[0]
+  switch (key) {
+    case 'this_week': {
+      const day = now.getDay() || 7
+      const mon = new Date(now); mon.setDate(now.getDate() - day + 1)
+      return { start: iso(mon), end: iso(now) }
+    }
+    case 'last_week': {
+      const day = now.getDay() || 7
+      const mon = new Date(now); mon.setDate(now.getDate() - day - 6)
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+      return { start: iso(mon), end: iso(sun) }
+    }
+    case 'this_month': {
+      const s = new Date(now.getFullYear(), now.getMonth(), 1)
+      return { start: iso(s), end: iso(now) }
+    }
+    case 'last_month': {
+      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const e = new Date(now.getFullYear(), now.getMonth(), 0)
+      return { start: iso(s), end: iso(e) }
+    }
+    case 'this_year': {
+      return { start: `${now.getFullYear()}-01-01`, end: iso(now) }
+    }
+    default: return null
+  }
+}
+
+const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
+
 export default function Report() {
   const { user } = useAuth()
   const toast = useToast()
-  const chartRef = useRef(null)
-  
+
   const [loading, setLoading] = useState(true)
   const [showMonthPicker, setShowMonthPicker] = useState(false)
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear())
+  const [dateMode, setDateMode] = useState('month') // 'month' | 'custom'
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const n = new Date()
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`
   })
-  const [summary, setSummary] = useState({
-    pemasukan: 0,
-    pengeluaran: 0,
-    saldo: 0,
-    total_transactions_pemasukan: 0,
-    total_transactions_pengeluaran: 0
-  })
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [activePreset, setActivePreset] = useState('')
+  const [txSearch, setTxSearch] = useState('')
+  const [filterType, setFilterType] = useState('')
+
+  const [summary, setSummary] = useState({ pemasukan: 0, pengeluaran: 0, saldo: 0, total_transactions_pemasukan: 0, total_transactions_pengeluaran: 0 })
   const [transactions, setTransactions] = useState([])
   const [chartData, setChartData] = useState([])
   const [yearlyData, setYearlyData] = useState(null)
 
+  const pickerRef = useRef(null)
 
   useEffect(() => {
-    fetchMonthlyReport()
-  }, [selectedMonth])
+    function h(e) { if (pickerRef.current && !pickerRef.current.contains(e.target)) setShowMonthPicker(false) }
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
+  }, [])
 
-  const fetchMonthlyReport = async () => {
+  useEffect(() => { fetchReport() }, [selectedMonth, customStart, customEnd, dateMode, activePreset])
+
+  const fetchReport = async () => {
     setLoading(true)
-
     if (DEBUG_MODE.ENABLED) {
       setTimeout(() => {
-        setSummary({
-          ...DUMMY_SUMMARY,
-          total_transactions_pemasukan: 2,
-          total_transactions_pengeluaran: 2
-        })
+        setSummary({ ...DUMMY_SUMMARY, total_transactions_pemasukan: 2, total_transactions_pengeluaran: 2 })
         setTransactions(DUMMY_ALL_TRANSACTIONS)
-        
-        setChartData([
-          { day: 1, pemasukan: 5000000, pengeluaran: 0 },
-          { day: 5, pemasukan: 0, pengeluaran: 1500000 },
-          { day: 10, pemasukan: 10000000, pengeluaran: 0 },
-          { day: 15, pemasukan: 0, pengeluaran: 3000000 }
-        ])
-        
+        setChartData([{ day: 1, pemasukan: 5000000, pengeluaran: 0 }, { day: 5, pemasukan: 0, pengeluaran: 1500000 }, { day: 10, pemasukan: 10000000, pengeluaran: 0 }])
         setYearlyData(Array.from({ length: 12 }, (_, i) => ({
           month: ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][i],
-          pemasukan: i === parseInt(selectedMonth.split('-')[1]) - 1 ? 15000000 : 5000000,
-          pengeluaran: i === parseInt(selectedMonth.split('-')[1]) - 1 ? 4500000 : 2000000,
+          pemasukan: 5000000, pengeluaran: 2000000,
           isCurrentMonth: i + 1 === parseInt(selectedMonth.split('-')[1])
         })))
-        
         setLoading(false)
-      }, 500)
+      }, 400)
       return
     }
 
     try {
-      const summaryRes = await transactionService.getSummary(selectedMonth)
+      let startDate, endDate
+      if (dateMode === 'custom' && customStart && customEnd) {
+        startDate = customStart; endDate = customEnd
+      } else {
+        startDate = `${selectedMonth}-01`
+        const [y, m] = selectedMonth.split('-')
+        endDate = `${selectedMonth}-${new Date(Number(y), Number(m), 0).getDate()}`
+      }
+
+      const summaryRes = await transactionService.getSummary(dateMode === 'month' ? selectedMonth : undefined)
       setSummary(summaryRes.data)
 
-      const transactionsRes = await transactionService.getTransactions({
-        startDate: `${selectedMonth}-01`,
-        endDate: `${selectedMonth}-${new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate()}`
-      })
-      
-      const sortedTransactions = transactionsRes.data.sort((a, b) => 
-        new Date(b.transaction_date) - new Date(a.transaction_date)
-      )
-      setTransactions(sortedTransactions)
+      const txRes = await transactionService.getTransactions({ startDate, endDate })
+      const sorted = txRes.data.sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date))
+      setTransactions(sorted)
 
+      // Daily chart
       const dailyMap = new Map()
-      sortedTransactions.forEach(trans => {
-        const day = new Date(trans.transaction_date).getDate()
-        if (!dailyMap.has(day)) {
-          dailyMap.set(day, { pemasukan: 0, pengeluaran: 0 })
-        }
-        const current = dailyMap.get(day)
-        if (trans.type === 'pemasukan') {
-          current.pemasukan += trans.amount
-        } else {
-          current.pengeluaran += trans.amount
-        }
+      sorted.forEach(t => {
+        const day = new Date(t.transaction_date).getDate()
+        const cur = dailyMap.get(day) || { pemasukan: 0, pengeluaran: 0 }
+        if (t.type === 'pemasukan') cur.pemasukan += t.amount; else cur.pengeluaran += t.amount
+        dailyMap.set(day, cur)
       })
+      setChartData([...dailyMap.entries()].sort((a, b) => a[0] - b[0]).map(([day, d]) => ({ day, ...d })))
 
-      const dailyChartData = Array.from(dailyMap.entries())
-        .sort((a, b) => a[0] - b[0])
-        .map(([day, data]) => ({
-          day,
-          pemasukan: data.pemasukan,
-          pengeluaran: data.pengeluaran
-        }))
-      
-      setChartData(dailyChartData)
-
+      // Yearly chart
       const year = selectedMonth.split('-')[0]
-      const yearlyTransactions = await transactionService.getTransactions({
-        startDate: `${year}-01-01`,
-        endDate: `${year}-12-31`
+      const yearlyRes = await transactionService.getTransactions({ startDate: `${year}-01-01`, endDate: `${year}-12-31` })
+      const monthMap = new Map()
+      yearlyRes.data.forEach(t => {
+        const mo = new Date(t.transaction_date).getMonth() + 1
+        const cur = monthMap.get(mo) || { pemasukan: 0, pengeluaran: 0 }
+        if (t.type === 'pemasukan') cur.pemasukan += t.amount; else cur.pengeluaran += t.amount
+        monthMap.set(mo, cur)
       })
-      
-      const monthlyMap = new Map()
-      yearlyTransactions.data.forEach(trans => {
-        const month = new Date(trans.transaction_date).getMonth() + 1
-        if (!monthlyMap.has(month)) {
-          monthlyMap.set(month, { pemasukan: 0, pengeluaran: 0 })
-        }
-        const current = monthlyMap.get(month)
-        if (trans.type === 'pemasukan') {
-          current.pemasukan += trans.amount
-        } else {
-          current.pengeluaran += trans.amount
-        }
-      })
-      
-      const monthlyYearlyData = Array.from({ length: 12 }, (_, i) => {
-        const monthData = monthlyMap.get(i + 1) || { pemasukan: 0, pengeluaran: 0 }
-        return {
-          month: getMonthName(i),
-          pemasukan: monthData.pemasukan,
-          pengeluaran: monthData.pengeluaran,
-          isCurrentMonth: i + 1 === parseInt(selectedMonth.split('-')[1])
-        }
-      })
-      
-      setYearlyData(monthlyYearlyData)
+      setYearlyData(Array.from({ length: 12 }, (_, i) => {
+        const d = monthMap.get(i + 1) || { pemasukan: 0, pengeluaran: 0 }
+        return { month: getMonthName(i), ...d, isCurrentMonth: i + 1 === parseInt(selectedMonth.split('-')[1]) }
+      }))
+    } catch { toast.error('Gagal memuat laporan') }
+    finally { setLoading(false) }
+  }
 
-    } catch (error) {
-      console.error('Error fetching report:', error)
-      toast.error('Gagal memuat laporan bulanan')
-    } finally {
-      setLoading(false)
-    }
+  const applyPreset = (key) => {
+    const range = getPreset(key)
+    if (!range) return
+    setActivePreset(key); setDateMode('custom'); setCustomStart(range.start); setCustomEnd(range.end)
   }
 
   const getCategoryData = () => {
-    const categories = new Map()
-    transactions.forEach(trans => {
-      if (trans.type === 'pengeluaran') {
-        const existing = categories.get(trans.description) || 0
-        categories.set(trans.description, existing + trans.amount)
+    const map = new Map()
+    transactions.forEach(t => { if (t.type === 'pengeluaran') map.set(t.description, (map.get(t.description) || 0) + t.amount) })
+    return [...map.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 5)
+  }
+
+  const displayedTx = useMemo(() => {
+    let rows = [...transactions]
+    if (filterType) rows = rows.filter(t => t.type === filterType)
+    if (txSearch.trim()) { const q = txSearch.toLowerCase(); rows = rows.filter(t => t.description.toLowerCase().includes(q)) }
+    return rows
+  }, [transactions, filterType, txSearch])
+
+  // Membuat label periode sesuai mode yang dipilih user
+  const getReportLabel = () => {
+    if (dateMode === 'custom' && (customStart || customEnd)) {
+      const fmt = (d) => d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '?'
+      if (activePreset) {
+        const presetLabel = PRESETS.find(p => p.key === activePreset)?.label || ''
+        return { title: `Laporan Keuangan – ${presetLabel}`, file: presetLabel.replace(/\s+/g, '_') }
       }
-    })
-    
-    return Array.from(categories.entries())
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
+      return { title: `Laporan Keuangan ${fmt(customStart)} – ${fmt(customEnd)}`, file: `${customStart}_sd_${customEnd}` }
+    }
+    // Mode bulan
+    const mn = getMonthName(parseInt(selectedMonth.split('-')[1]) - 1)
+    const yr = selectedMonth.split('-')[0]
+    return { title: `Laporan Keuangan ${mn} ${yr}`, file: `${mn}_${yr}` }
   }
 
   const exportToPDF = () => {
     try {
       const doc = new jsPDF('p', 'mm', 'a4')
-      const selectedDate = new Date(selectedMonth.split('-')[0], parseInt(selectedMonth.split('-')[1]) - 1)
-      const monthName = getMonthName(selectedDate.getMonth())
-      const year = selectedDate.getFullYear()
-      
-      doc.setFontSize(20)
-      doc.setTextColor(0, 0, 0)
-      doc.text(`Laporan Keuangan ${monthName} ${year}`, 14, 20)
-      
-      doc.setFontSize(11)
-      doc.setTextColor(100, 100, 100)
-      doc.text(`Nama: ${user?.name || 'Pengguna'}`, 14, 30)
-      doc.text(`Email: ${user?.email || '-'}`, 14, 36)
-      doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 42)
-      
-      const summaryData = [
-        ['Total Pemasukan', `Rp ${formatRupiah(summary.pemasukan)}`],
-        ['Total Pengeluaran', `Rp ${formatRupiah(summary.pengeluaran)}`],
-        ['Saldo Akhir', `Rp ${formatRupiah(summary.saldo)}`],
-        ['Jumlah Transaksi Pemasukan', summary.total_transactions_pemasukan.toString()],
-        ['Jumlah Transaksi Pengeluaran', summary.total_transactions_pengeluaran.toString()],
-      ]
-      
-      autoTable(doc, {
-        startY: 48,
-        head: [['Deskripsi', 'Nilai']],
-        body: summaryData,
-        theme: 'grid',
-        styles: { fontSize: 10 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontSize: 11 },
-        alternateRowStyles: { fillColor: [240, 240, 240] }
-      })
-      
-      let finalY = doc.lastAutoTable?.finalY || 58
-      finalY = finalY + 10
-      
+      const { title, file } = getReportLabel()
+      doc.setFontSize(18); doc.text(title, 14, 20)
+      doc.setFontSize(10); doc.setTextColor(100, 100, 100)
+      doc.text(`Nama: ${user?.name || '-'} | Email: ${user?.email || '-'} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 30)
+      autoTable(doc, { startY: 36, head: [['Deskripsi', 'Nilai']],
+        body: [['Total Pemasukan', `Rp ${formatRupiah(summary.pemasukan)}`], ['Total Pengeluaran', `Rp ${formatRupiah(summary.pengeluaran)}`], ['Saldo', `Rp ${formatRupiah(summary.saldo)}`]],
+        theme: 'grid', styles: { fontSize: 9 }, headStyles: { fillColor: [16, 185, 129] } })
       if (transactions.length > 0) {
-        const transactionData = transactions.map(t => [
-          formatDateFull(t.transaction_date),
-          t.description,
-          t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran',
-          `Rp ${formatRupiah(t.amount)}`
-        ])
-        
         autoTable(doc, {
-          startY: finalY,
+          startY: (doc.lastAutoTable?.finalY || 50) + 8,
           head: [['Tanggal', 'Keterangan', 'Tipe', 'Nominal']],
-          body: transactionData,
-          theme: 'grid',
-          styles: { fontSize: 9 },
-          headStyles: { fillColor: [34, 197, 94], textColor: 255, fontSize: 10 },
-          alternateRowStyles: { fillColor: [250, 250, 250] }
-        })
-        
-        finalY = doc.lastAutoTable?.finalY || finalY
-        finalY = finalY + 10
-      }
-      
-      const categoryData = getCategoryData()
-      if (categoryData.length > 0) {
-        const categoryTableData = categoryData.map(c => [
-          c.name,
-          `Rp ${formatRupiah(c.value)}`,
-          `${((c.value / summary.pengeluaran) * 100).toFixed(1)}%`
-        ])
-        
-        autoTable(doc, {
-          startY: finalY,
-          head: [['Kategori', 'Total', 'Persentase']],
-          body: categoryTableData,
-          theme: 'grid',
-          styles: { fontSize: 9 },
-          headStyles: { fillColor: [239, 68, 68], textColor: 255, fontSize: 10 },
-          alternateRowStyles: { fillColor: [250, 250, 250] }
+          body: transactions.map(t => [formatDateFull(t.transaction_date), t.description, t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran', `Rp ${formatRupiah(t.amount)}`]),
+          theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [34, 197, 94] }
         })
       }
-      
-      const pageCount = doc.getNumberOfPages()
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i)
-        doc.setFontSize(8)
-        doc.setTextColor(150, 150, 150)
-        doc.text(
-          `TabunganQu - Laporan Bulanan | Halaman ${i} dari ${pageCount}`,
-          doc.internal.pageSize.width / 2,
-          doc.internal.pageSize.height - 10,
-          { align: 'center' }
-        )
-      }
-      
-      doc.save(`Laporan_${monthName}_${year}.pdf`)
-      toast.success('PDF berhasil diexport! 📄')
-    } catch (error) {
-      console.error('Error exporting PDF:', error)
-      toast.error('Gagal export PDF')
-    }
+      doc.save(`Laporan_${file}.pdf`)
+      toast.success('PDF berhasil diexport!')
+    } catch { toast.error('Gagal export PDF') }
   }
 
   const exportToExcel = () => {
     try {
-      const selectedDate = new Date(selectedMonth.split('-')[0], parseInt(selectedMonth.split('-')[1]) - 1)
-      const monthName = getMonthName(selectedDate.getMonth())
-      const year = selectedDate.getFullYear()
-      
+      const { title, file } = getReportLabel()
       const wb = XLSX.utils.book_new()
-      
-      const summarySheetData = [
-        ['Laporan Keuangan', `${monthName} ${year}`],
-        [''],
-        ['Nama', user?.name || 'Pengguna'],
-        ['Email', user?.email || '-'],
-        ['Tanggal Cetak', new Date().toLocaleDateString('id-ID')],
-        [''],
-        ['Ringkasan Keuangan'],
-        ['Deskripsi', 'Nilai'],
-        ['Total Pemasukan', summary.pemasukan],
-        ['Total Pengeluaran', summary.pengeluaran],
-        ['Saldo Akhir', summary.saldo],
-        ['Jumlah Transaksi Pemasukan', summary.total_transactions_pemasukan],
-        ['Jumlah Transaksi Pengeluaran', summary.total_transactions_pengeluaran],
-        [''],
-        ['Rata-rata Pengeluaran per Transaksi', summary.total_transactions_pengeluaran > 0 
-          ? Math.round(summary.pengeluaran / summary.total_transactions_pengeluaran) 
-          : 0]
-      ]
-      
-      const summarySheet = XLSX.utils.aoa_to_sheet(summarySheetData)
-      XLSX.utils.book_append_sheet(wb, summarySheet, 'Ringkasan')
-      
+      const sum = [['Laporan Keuangan', title], [''], ['Nama', user?.name], ['Email', user?.email], [''], ['Deskripsi', 'Nilai'], ['Pemasukan', summary.pemasukan], ['Pengeluaran', summary.pengeluaran], ['Saldo', summary.saldo]]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), 'Ringkasan')
       if (transactions.length > 0) {
-        const transactionSheetData = [
-          ['Detail Transaksi', `${monthName} ${year}`],
-          [''],
-          ['Tanggal', 'Keterangan', 'Tipe', 'Nominal', 'Nominal (Rp)']
-        ]
-        
-        transactions.forEach(t => {
-          transactionSheetData.push([
-            formatDateFull(t.transaction_date),
-            t.description,
-            t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran',
-            `Rp ${formatRupiah(t.amount)}`,
-            t.amount
-          ])
-        })
-        
-        const transactionSheet = XLSX.utils.aoa_to_sheet(transactionSheetData)
-        transactionSheet['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 15 }]
-        XLSX.utils.book_append_sheet(wb, transactionSheet, 'Transaksi')
+        const txSheet = [['Tanggal', 'Keterangan', 'Tipe', 'Nominal'], ...transactions.map(t => [formatDateFull(t.transaction_date), t.description, t.type, t.amount])]
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(txSheet), 'Transaksi')
       }
-      
-      const categoryData = getCategoryData()
-      if (categoryData.length > 0) {
-        const categorySheetData = [
-          ['Analisis Kategori Pengeluaran', `${monthName} ${year}`],
-          [''],
-          ['Kategori', 'Total Pengeluaran (Rp)', 'Total Pengeluaran', 'Persentase']
-        ]
-        
-        categoryData.forEach(c => {
-          const percentage = ((c.value / summary.pengeluaran) * 100).toFixed(1)
-          categorySheetData.push([
-            c.name,
-            c.value,
-            `Rp ${formatRupiah(c.value)}`,
-            `${percentage}%`
-          ])
-        })
-        
-        categorySheetData.push([''], ['Total Keseluruhan', summary.pengeluaran, `Rp ${formatRupiah(summary.pengeluaran)}`, '100%'])
-        
-        const categorySheet = XLSX.utils.aoa_to_sheet(categorySheetData)
-        categorySheet['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 12 }]
-        XLSX.utils.book_append_sheet(wb, categorySheet, 'Analisis Kategori')
-      }
-      
-      if (chartData.length > 0) {
-        const dailySheetData = [
-          ['Ringkasan Harian', `${monthName} ${year}`],
-          [''],
-          ['Tanggal', 'Pemasukan (Rp)', 'Pengeluaran (Rp)', 'Saldo Harian']
-        ]
-        
-        let runningBalance = 0
-        chartData.forEach(day => {
-          runningBalance += day.pemasukan - day.pengeluaran
-          dailySheetData.push([
-            `${day.day}`,
-            day.pemasukan,
-            day.pengeluaran,
-            runningBalance
-          ])
-        })
-        
-        const dailySheet = XLSX.utils.aoa_to_sheet(dailySheetData)
-        dailySheet['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 20 }]
-        XLSX.utils.book_append_sheet(wb, dailySheet, 'Ringkasan Harian')
-      }
-      
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-      const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      saveAs(data, `Laporan_${monthName}_${year}.xlsx`)
-      
-      toast.success('Excel berhasil diexport! 📊')
-    } catch (error) {
-      console.error('Error exporting Excel:', error)
-      toast.error('Gagal export Excel')
-    }
+      const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      saveAs(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `Laporan_${file}.xlsx`)
+      toast.success('Excel berhasil diexport!')
+    } catch { toast.error('Gagal export Excel') }
   }
-
-  const pieColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
 
   const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-[#2A2A2A] py-2 px-3 rounded-lg shadow-lg text-white text-sm">
-          <p className="font-semibold mb-1">Tanggal: {label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }}>
-              {entry.name === 'Pemasukan' ? '💰 Pemasukan' : '📉 Pengeluaran'}: Rp {formatRupiah(entry.value)}
-            </p>
-          ))}
-        </div>
-      )
-    }
-    return null
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <LoadingSpinner />
+    if (active && payload?.length) return (
+      <div className="bg-[#1e2b21] border border-white/[0.09] py-2 px-3 rounded-xl shadow-xl text-[12px] text-white">
+        <p className="font-semibold mb-1 text-white/60">{label}</p>
+        {payload.map((e, i) => (
+          <p key={i} style={{ color: e.color }} className="font-mono">{e.name}: Rp {formatRupiah(e.value)}</p>
+        ))}
       </div>
     )
+    return null
   }
 
   const selectedDate = new Date(selectedMonth.split('-')[0], parseInt(selectedMonth.split('-')[1]) - 1)
@@ -408,299 +232,270 @@ export default function Report() {
   const year = selectedDate.getFullYear()
   const categoryData = getCategoryData()
 
+  const PRESETS = [
+    { key: 'this_week', label: 'Minggu ini' },
+    { key: 'last_week', label: 'Minggu lalu' },
+    { key: 'this_month', label: 'Bulan ini' },
+    { key: 'last_month', label: 'Bulan lalu' },
+    { key: 'this_year', label: 'Tahun ini' },
+  ]
+
+  if (loading) return <div className="min-h-[60vh] flex items-center justify-center"><LoadingSpinner /></div>
+
   return (
-    <div className="text-white pb-10 animate-fade-in font-['Inter',_sans-serif]">
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div>
-            <h2 className="text-[28px] md:text-[32px] font-normal text-white m-0">
-              Laporan Bulanan
-            </h2>
-            <p className="text-white/60 text-sm mt-1">
-              Ringkasan transaksi dan analisis keuangan
-            </p>
+    <div className="text-white pb-10 animate-fade-in">
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div>
+          <p className="text-[12px] text-white/40 mt-0.5">Analisis keuangan & ekspor laporan</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={exportToPDF}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/25 bg-red-500/[0.07] text-red-300/80 hover:bg-red-500/[0.14] transition-colors text-[12px] font-medium">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Export PDF
+          </button>
+          <button onClick={exportToExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] text-emerald-300/80 hover:bg-emerald-500/[0.14] transition-colors text-[12px] font-medium">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Export Excel
+          </button>
+        </div>
+      </div>
+
+      {/* Date filter section */}
+      <div className="tq-card p-4 mb-5">
+        <p className="text-[11px] text-white/35 uppercase tracking-wider font-semibold mb-3">Filter Periode</p>
+
+        {/* Quick presets */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {PRESETS.map(p => (
+            <button key={p.key} onClick={() => applyPreset(p.key)}
+              className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${activePreset === p.key && dateMode === 'custom' ? 'bg-emerald-600 text-white' : 'border border-white/[0.09] text-white/55 hover:text-white hover:border-white/20'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Mode tabs */}
+        <div className="flex gap-2 flex-wrap items-end">
+          <div className="flex rounded-xl border border-white/[0.09] overflow-hidden text-[12px]">
+            <button onClick={() => { setDateMode('month'); setActivePreset('') }}
+              className={`px-3 py-1.5 font-medium transition ${dateMode === 'month' ? 'bg-white/[0.12] text-white' : 'text-white/45 hover:text-white hover:bg-white/[0.06]'}`}>
+              Pilih Bulan
+            </button>
+            <button onClick={() => { setDateMode('custom'); setActivePreset('') }}
+              className={`px-3 py-1.5 font-medium transition ${dateMode === 'custom' && !activePreset ? 'bg-white/[0.12] text-white' : 'text-white/45 hover:text-white hover:bg-white/[0.06]'}`}>
+              Rentang Tanggal
+            </button>
           </div>
-          
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={exportToPDF}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 transition text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              PDF
-            </button>
-            <button
-              onClick={exportToExcel}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center gap-1.5 transition text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Excel
-            </button>
-            <div className="relative">
+
+          {dateMode === 'month' && (
+            <div className="relative" ref={pickerRef}>
               <button
                 onClick={() => { setShowMonthPicker(!showMonthPicker); setPickerYear(parseInt(selectedMonth.split('-')[0])) }}
-                className="flex items-center gap-2 bg-[#3a3a3a] border border-white/10 hover:border-white/30 text-white rounded-lg px-4 py-2 text-[14px] transition"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                className="flex items-center gap-2 tq-field px-3 py-2 text-[13px]">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 {getMonthName(parseInt(selectedMonth.split('-')[1]) - 1)} {selectedMonth.split('-')[0]}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
-
               {showMonthPicker && (
-                <div className="absolute right-0 top-11 z-50 bg-[#2a2a2a] border border-white/10 rounded-xl shadow-2xl p-4 w-[280px]">
-                  {/* Year navigation */}
+                <div className="absolute left-0 top-[calc(100%+6px)] z-50 bg-[#1e2b21] border border-white/[0.09] rounded-xl shadow-2xl p-4 w-[260px]">
                   <div className="flex items-center justify-between mb-3">
-                    <button onClick={() => setPickerYear(y => y - 1)} className="text-white/60 hover:text-white p-1 rounded transition">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    <button onClick={() => setPickerYear(y => y - 1)} className="text-white/50 hover:text-white p-1 rounded transition">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
                     </button>
-                    <span className="text-white font-semibold">{pickerYear}</span>
-                    <button onClick={() => setPickerYear(y => y + 1)} className="text-white/60 hover:text-white p-1 rounded transition">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    <span className="text-[13px] font-semibold text-white">{pickerYear}</span>
+                    <button onClick={() => setPickerYear(y => y + 1)} className="text-white/50 hover:text-white p-1 rounded transition">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                     </button>
                   </div>
-                  {/* Month grid */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'].map((m, i) => {
                       const val = `${pickerYear}-${String(i + 1).padStart(2, '0')}`
-                      const isSelected = val === selectedMonth
+                      const isSel = val === selectedMonth
                       return (
-                        <button
-                          key={i}
-                          onClick={() => { setSelectedMonth(val); setShowMonthPicker(false) }}
-                          className={`py-2 rounded-lg text-sm font-medium transition ${isSelected ? 'bg-emerald-600 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
-                        >
+                        <button key={i} onClick={() => { setSelectedMonth(val); setShowMonthPicker(false) }}
+                          className={`py-1.5 rounded-lg text-[12px] font-medium transition ${isSel ? 'bg-emerald-600 text-white' : 'text-white/60 hover:bg-white/[0.09] hover:text-white'}`}>
                           {m}
                         </button>
                       )
                     })}
                   </div>
-                  {/* This month shortcut */}
-                  <button
-                    onClick={() => {
-                      const now = new Date()
-                      setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
-                      setShowMonthPicker(false)
-                    }}
-                    className="mt-3 w-full text-center text-emerald-400 hover:text-emerald-300 text-sm transition"
-                  >
+                  <button onClick={() => { const n = new Date(); setSelectedMonth(`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`); setShowMonthPicker(false) }}
+                    className="mt-3 w-full text-center text-[12px] text-emerald-400 hover:text-emerald-300 transition">
                     Bulan ini
                   </button>
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-          <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl p-3 md:p-5">
-            <p className="text-xs md:text-sm opacity-90">Saldo Akhir</p>
-            <p className="text-lg md:text-2xl font-bold">Rp {formatRupiah(summary.saldo)}</p>
-          </div>
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-3 md:p-5">
-            <p className="text-xs md:text-sm opacity-90">Total Pemasukan</p>
-            <p className="text-lg md:text-2xl font-bold">Rp {formatRupiah(summary.pemasukan)}</p>
-            <p className="text-xs opacity-75 mt-1">{summary.total_transactions_pemasukan} transaksi</p>
-          </div>
-          <div className="bg-gradient-to-br from-red-600 to-red-700 rounded-xl p-3 md:p-5">
-            <p className="text-xs md:text-sm opacity-90">Total Pengeluaran</p>
-            <p className="text-lg md:text-2xl font-bold">Rp {formatRupiah(summary.pengeluaran)}</p>
-            <p className="text-xs opacity-75 mt-1">{summary.total_transactions_pengeluaran} transaksi</p>
-          </div>
-          <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl p-3 md:p-5">
-            <p className="text-xs md:text-sm opacity-90">Rata-rata Keluar</p>
-            <p className="text-lg md:text-2xl font-bold">
-              Rp {formatRupiah(summary.total_transactions_pengeluaran > 0 
-                ? Math.round(summary.pengeluaran / summary.total_transactions_pengeluaran) 
-                : 0)}
-            </p>
-            <p className="text-xs opacity-75 mt-1">per transaksi</p>
-          </div>
-        </div>
-
-        <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 mb-6 border border-white/5">
-          <h3 className="text-[18px] font-medium text-white mb-4">
-            Grafik Harian - {monthName} {year}
-          </h3>
-          <div className="w-full h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={true} 
-                  tickLine={false} 
-                  tick={{ fill: 'white', fontSize: 12 }} 
-                  label={{ value: 'Tanggal', position: 'insideBottom', offset: -15, fill: 'white' }}
-                />
-                <YAxis 
-                  axisLine={true} 
-                  tickLine={false} 
-                  allowDecimals={false}
-                  tick={{ fill: 'white', fontSize: 12 }}
-                  tickFormatter={(v) => {
-                    if (v === 0) return '0'
-                    if (v >= 1000000) return `${v / 1000000}jt`
-                    if (v >= 1000) return `${v / 1000}k`
-                    return v
-                  }}
-                  label={{ value: 'Nominal (Rp)', angle: -90, position: 'insideLeft', fill: 'white' }}
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                <Bar dataKey="pemasukan" fill="#10b981" radius={[4, 4, 0, 0]} name="Pemasukan" />
-                <Bar dataKey="pengeluaran" fill="#ef4444" radius={[4, 4, 0, 0]} name="Pengeluaran" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {yearlyData && (
-          <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 mb-6 border border-white/5">
-            <h3 className="text-[18px] font-medium text-white mb-4">
-              Perbandingan Bulanan - {year}
-            </h3>
-            <div className="w-full h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={yearlyData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                  <XAxis 
-                    dataKey="month" 
-                    axisLine={true} 
-                    tickLine={false} 
-                    tick={{ fill: 'white', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    axisLine={true} 
-                    tickLine={false} 
-                    allowDecimals={false}
-                    tick={{ fill: 'white', fontSize: 12 }}
-                    tickFormatter={(v) => {
-                      if (v === 0) return '0'
-                      if (v >= 1000000) return `${v / 1000000}jt`
-                      if (v >= 1000) return `${v / 1000}k`
-                      return v
-                    }}
-                  />
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                  <Bar 
-                    dataKey="pemasukan" 
-                    fill="#10b981" 
-                    radius={[4, 4, 0, 0]} 
-                    name="Pemasukan"
-                    opacity={(data) => data.isCurrentMonth ? 1 : 0.6}
-                  />
-                  <Bar 
-                    dataKey="pengeluaran" 
-                    fill="#ef4444" 
-                    radius={[4, 4, 0, 0]} 
-                    name="Pengeluaran"
-                    opacity={(data) => data.isCurrentMonth ? 1 : 0.6}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+          {(dateMode === 'custom') && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <input type="date" value={customStart} onChange={e => { setCustomStart(e.target.value); setActivePreset('') }}
+                className="tq-field px-3 py-2 text-[12px]" />
+              <span className="text-[12px] text-white/30">s/d</span>
+              <input type="date" value={customEnd} onChange={e => { setCustomEnd(e.target.value); setActivePreset('') }}
+                className="tq-field px-3 py-2 text-[12px]" />
             </div>
-            <p className="text-white/50 text-xs text-center mt-2">
-              *Bulan ini ditandai dengan warna lebih terang
-            </p>
-          </div>
-        )}
+          )}
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-6 border border-white/5">
-            <h3 className="text-[18px] font-medium text-white mb-4">
-              Kategori Pengeluaran
-            </h3>
-            {categoryData.length === 0 ? (
-              <div className="text-center text-white/50 py-12">
-                Belum ada data pengeluaran
-              </div>
-            ) : (
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-5">
+        {[
+          { label: 'Saldo', val: summary.saldo, from: 'from-emerald-700', to: 'to-teal-900', shadow: 'shadow-[0_4px_16px_rgba(16,185,129,0.12)]', sub: null },
+          { label: 'Pemasukan', val: summary.pemasukan, from: 'from-sky-700/90', to: 'to-indigo-900', shadow: 'shadow-[0_4px_16px_rgba(59,130,246,0.10)]', sub: `${summary.total_transactions_pemasukan} transaksi` },
+          { label: 'Pengeluaran', val: summary.pengeluaran, from: 'from-rose-800/80', to: 'to-slate-900', shadow: 'shadow-[0_4px_16px_rgba(239,68,68,0.09)]', sub: `${summary.total_transactions_pengeluaran} transaksi` },
+          { label: 'Rata-rata Keluar', val: summary.total_transactions_pengeluaran > 0 ? Math.round(summary.pengeluaran / summary.total_transactions_pengeluaran) : 0, from: 'from-slate-700', to: 'to-slate-900', shadow: 'shadow-[0_4px_16px_rgba(99,102,241,0.08)]', sub: 'per transaksi' },
+        ].map(({ label, val, from, to, shadow, sub }) => (
+          <div key={label} className={`rounded-xl p-3 min-[901px]:p-3.5 flex flex-col gap-1 bg-gradient-to-br ${from} ${to} ring-1 ring-white/[0.08] ${shadow}`}>
+            <p className="text-[10px] opacity-70 uppercase tracking-widest font-medium">{label}</p>
+            <p className="text-[14px] min-[901px]:text-[16px] font-semibold leading-tight tabular-nums">Rp {formatRupiah(val)}</p>
+            {sub && <p className="text-[10px] opacity-50">{sub}</p>}
+          </div>
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+        {/* Daily chart */}
+        <div className="tq-card p-5">
+          <h3 className="text-[13px] font-semibold text-white mb-4">Grafik Harian – {monthName} {year}</h3>
+          <ResponsiveContainer width="100%" height={230}>
+            <BarChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+              <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+              <YAxis axisLine={false} tickLine={false} allowDecimals={false}
+                tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+                tickFormatter={v => { if (!v) return '0'; if (v >= 1000000) return `${v/1000000}jt`; if (v >= 1000) return `${v/1000}k`; return v }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+              <Bar dataKey="pemasukan" fill="#10b981" radius={[3,3,0,0]} barSize={14} name="Pemasukan" />
+              <Bar dataKey="pengeluaran" fill="#ef4444" radius={[3,3,0,0]} barSize={14} name="Pengeluaran" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Expense pie chart */}
+        <div className="tq-card p-5">
+          <h3 className="text-[13px] font-semibold text-white mb-4">Kategori Pengeluaran</h3>
+          {categoryData.length === 0
+            ? <div className="flex items-center justify-center h-[200px] text-[13px] text-white/30">Belum ada data pengeluaran</div>
+            : (
               <>
-                <div className="w-full h-[250px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => `Rp ${formatRupiah(value)}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4 space-y-2">
-                  {categoryData.map((cat, idx) => (
-                    <div key={idx} className="flex justify-between items-center text-sm">
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={categoryData} cx="50%" cy="50%" outerRadius={65} dataKey="value">
+                      {categoryData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v) => `Rp ${formatRupiah(v)}`} contentStyle={{ background: '#1e2b21', border: 'none', borderRadius: 12, fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="space-y-1.5 mt-2">
+                  {categoryData.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between text-[12px]">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: pieColors[idx % pieColors.length] }}></div>
-                        <span>{cat.name}</span>
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                        <span className="text-white/70 truncate max-w-[140px]">{c.name}</span>
                       </div>
-                      <span className="font-mono">Rp {formatRupiah(cat.value)}</span>
+                      <span className="font-mono text-white/60">Rp {formatRupiah(c.value)}</span>
                     </div>
                   ))}
                 </div>
               </>
-            )}
-          </div>
+            )
+          }
+        </div>
+      </div>
 
-          <div className="bg-[#555555] bg-[linear-gradient(260deg,rgba(0,0,0,0.2)_60%,rgba(153,153,153,0.2)_100%)] rounded-[18px] p-4 md:p-6 border border-white/5">
-            <h3 className="text-[16px] md:text-[18px] font-medium text-white mb-4">
-              Detail Transaksi
-            </h3>
-            {transactions.length === 0 ? (
-              <div className="text-center text-white/50 py-12">
-                Belum ada transaksi bulan ini
-              </div>
-            ) : (
-              <>
-                {/* Mobile: Card List */}
-                <div className="flex flex-col gap-3 md:hidden max-h-[400px] overflow-y-auto pr-1">
-                  {transactions.map(trans => (
-                    <div key={trans.id} className="bg-white/5 rounded-xl p-3 border border-white/10">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-white/50 text-[11px]">{formatDateFull(trans.transaction_date)}</span>
-                        <span className={`font-mono font-bold text-[14px] ${trans.type === 'pemasukan' ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {trans.type === 'pemasukan' ? '+' : '-'} Rp {formatRupiah(trans.amount)}
-                        </span>
-                      </div>
-                      <p className="text-white/80 text-[13px]">{trans.description}</p>
-                    </div>
-                  ))}
-                </div>
-                {/* Desktop: Table */}
-                <div className="overflow-x-auto max-h-[400px] overflow-y-auto hidden md:block">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-[#666666]">
-                      <tr>
-                        <th className="text-left py-2 px-3">Tanggal</th>
-                        <th className="text-left py-2 px-3">Keterangan</th>
-                        <th className="text-right py-2 px-3">Nominal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.map(trans => (
-                        <tr key={trans.id} className="border-t border-white/10">
-                          <td className="py-2 px-3">{formatDateFull(trans.transaction_date)}</td>
-                          <td className="py-2 px-3">{trans.description}</td>
-                          <td className={`py-2 px-3 text-right font-mono ${trans.type === 'pemasukan' ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {trans.type === 'pemasukan' ? '+' : '-'} Rp {formatRupiah(trans.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
+      {/* Yearly comparison */}
+      {yearlyData && (
+        <div className="tq-card p-5 mb-5">
+          <h3 className="text-[13px] font-semibold text-white mb-4">Perbandingan Bulanan – {year}</h3>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={yearlyData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
+              <YAxis axisLine={false} tickLine={false} allowDecimals={false}
+                tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+                tickFormatter={v => { if (!v) return '0'; if (v >= 1000000) return `${v/1000000}jt`; if (v >= 1000) return `${v/1000}k`; return v }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+              <Bar dataKey="pemasukan" fill="#10b981" radius={[3,3,0,0]} barSize={12} name="Pemasukan" />
+              <Bar dataKey="pengeluaran" fill="#ef4444" radius={[3,3,0,0]} barSize={12} name="Pengeluaran" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Transaction list */}
+      <div className="tq-card p-4 min-[901px]:p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h3 className="m-0 text-[14px] font-semibold">Detail Transaksi</h3>
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex rounded-lg border border-white/[0.09] overflow-hidden text-[12px]">
+              {[{ v: '', l: 'Semua' }, { v: 'pemasukan', l: 'Masuk' }, { v: 'pengeluaran', l: 'Keluar' }].map(o => (
+                <button key={o.v} onClick={() => setFilterType(o.v)}
+                  className={`px-3 py-1.5 font-medium transition ${filterType === o.v
+                    ? o.v === 'pemasukan' ? 'bg-emerald-600 text-white' : o.v === 'pengeluaran' ? 'bg-rose-600 text-white' : 'bg-white/[0.12] text-white'
+                    : 'text-white/45 hover:text-white hover:bg-white/[0.06]'}`}>
+                  {o.l}
+                </button>
+              ))}
+            </div>
+            <input type="text" placeholder="Cari keterangan..." value={txSearch}
+              onChange={e => setTxSearch(e.target.value)} className="tq-field px-3 py-1.5 text-[12px] w-40 sm:w-52" />
           </div>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="flex flex-col gap-2.5 md:hidden">
+          {displayedTx.length === 0
+            ? <div className="py-10 text-center text-[13px] text-white/30">Belum ada transaksi</div>
+            : displayedTx.map(t => (
+              <div key={t.id} className="tq-card-inner p-3.5">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-[11px] text-white/40">{formatDateFull(t.transaction_date)}</span>
+                  <span className={`font-mono font-bold text-[13px] ${t.type === 'pemasukan' ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {t.type === 'pemasukan' ? '+' : '-'} Rp {formatRupiah(t.amount)}
+                  </span>
+                </div>
+                <p className="text-[13px] text-white/80">{t.description}</p>
+              </div>
+            ))
+          }
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-white/[0.07]">
+          <table className="w-full min-w-[500px]">
+            <thead className="bg-white/[0.04]">
+              <tr>
+                {['Tanggal', 'Keterangan', 'Tipe', 'Nominal'].map(h => (
+                  <th key={h} className={`px-3 py-2.5 text-[11px] font-semibold text-white/40 uppercase tracking-wider ${h === 'Nominal' ? 'text-right' : 'text-left'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/[0.05]">
+              {displayedTx.length === 0
+                ? <tr><td colSpan={4} className="py-10 text-center text-[13px] text-white/30">Belum ada transaksi</td></tr>
+                : displayedTx.map(t => (
+                  <tr key={t.id} className="hover:bg-white/[0.03] transition-colors">
+                    <td className="px-3 py-2.5 text-[12px] text-white/60 whitespace-nowrap">{formatDateFull(t.transaction_date)}</td>
+                    <td className="px-3 py-2.5 text-[13px] text-white/80 max-w-[240px] truncate">{t.description}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`tq-badge ${t.type === 'pemasukan' ? 'tq-badge-income' : 'tq-badge-expense'}`}>
+                        {t.type === 'pemasukan' ? 'Masuk' : 'Keluar'}
+                      </span>
+                    </td>
+                    <td className={`px-3 py-2.5 text-right font-mono text-[12px] ${t.type === 'pemasukan' ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {t.type === 'pemasukan' ? '+' : '-'} Rp {formatRupiah(t.amount)}
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
         </div>
       </div>
 

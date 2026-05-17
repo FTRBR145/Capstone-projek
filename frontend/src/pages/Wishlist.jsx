@@ -1,393 +1,282 @@
-import { useState, useEffect } from "react";
-import { useToast } from "../context/ToastContext";
-import { wishlistService } from "../services/wishlistService";
-import { transactionService } from "../services/transactionService";
-import { DEBUG_MODE } from "../config/debugMode";
-import { DUMMY_SUMMARY, DUMMY_WISHLIST } from "../data/dummyData";
-import { formatRupiah } from "../utils/helpers";
-import Modal from "../components/ui/Modal";
-import Footer from "../components/layout/Footer";
-import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { useState, useEffect } from 'react'
+import { useToast } from '../context/ToastContext'
+import { wishlistService } from '../services/wishlistService'
+import { transactionService } from '../services/transactionService'
+import { DEBUG_MODE } from '../config/debugMode'
+import { DUMMY_SUMMARY, DUMMY_WISHLIST } from '../data/dummyData'
+import { formatRupiah } from '../utils/helpers'
+import Modal from '../components/ui/Modal'
+import Footer from '../components/layout/Footer'
+import LoadingSpinner from '../components/ui/LoadingSpinner'
 
-const formatRupiahInput = (value) => {
-  if (!value) return "";
+/* ─── Helpers ─────────────────────────────────────────── */
+const formatRupiahInput = (v) => {
+  if (!v) return ''
+  const n = v.toString().replace(/[^,\d]/g, ''), s = n.split(',')
+  let sisa = s[0].length % 3, r = s[0].substr(0, sisa)
+  const rib = s[0].substr(sisa).match(/\d{3}/gi)
+  if (rib) r += (sisa ? '.' : '') + rib.join('.')
+  return s[1] !== undefined ? r + ',' + s[1] : r
+}
+const parseNum = (s) => parseInt((s || '').replace(/[^,\d]/g, '')) || 0
 
-  // Hanya ambil angka
-  const number = value.toString().replace(/[^,\d]/g, "");
-  const split = number.split(",");
-  let sisa = split[0].length % 3;
-  let rupiah = split[0].substr(0, sisa);
-  const ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+const CATEGORIES = [
+  { value: 'tabungan',   label: 'Tabungan',          badge: 'tq-badge-savings', dot: 'bg-indigo-400' },
+  { value: 'pemasukan',  label: 'Pemasukan Wishlist', badge: 'tq-badge-income',  dot: 'bg-emerald-400' },
+  { value: 'pengeluaran',label: 'Pengeluaran Wishlist',badge: 'tq-badge-expense', dot: 'bg-red-400' },
+]
 
-  if (ribuan) {
-    const separator = sisa ? "." : "";
-    rupiah += separator + ribuan.join(".");
-  }
+const getCatInfo = (cat) => CATEGORIES.find(c => c.value === cat) || CATEGORIES[0]
 
-  rupiah = split[1] !== undefined ? rupiah + "," + split[1] : rupiah;
-  return rupiah;
-};
+/* Progress bar color by category */
+const progressColor = (cat) => {
+  if (cat === 'pemasukan') return 'bg-emerald-500'
+  if (cat === 'pengeluaran') return 'bg-red-500'
+  return 'bg-indigo-500'
+}
 
-const parseRupiahToNumber = (rupiahString) => {
-  if (!rupiahString) return 0;
-  return parseInt(rupiahString.replace(/[^,\d]/g, "")) || 0;
-};
+/* We store category in a local Map (session-only) since backend has no category field */
+const LOCAL_CAT_KEY = 'tq_wishlist_cats'
+const loadCats = () => { try { return JSON.parse(localStorage.getItem(LOCAL_CAT_KEY) || '{}') } catch { return {} } }
+const saveCats = (map) => localStorage.setItem(LOCAL_CAT_KEY, JSON.stringify(map))
 
 export default function Wishlist() {
-  const toast = useToast();
+  const toast = useToast()
+  const [loading, setLoading] = useState(true)
+  const [wishlists, setWishlists] = useState([])
+  const [summary, setSummary] = useState({ saldo: 0 })
+  const [search, setSearch] = useState('')
+  const [filterCat, setFilterCat] = useState('')
+  const [catMap, setCatMap] = useState(loadCats) // { [id]: category }
 
-  const [loading, setLoading] = useState(true);
-  const [wishlists, setWishlists] = useState([]);
-  const [summary, setSummary] = useState({ saldo: 0 });
-  const [search, setSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editItem, setEditItem] = useState(null)
+  const [formData, setFormData] = useState({ name: '', targetAmount: '', savedAmount: '0', category: 'tabungan' })
+  const [targetDisplay, setTargetDisplay] = useState('')
+  const [savedDisplay, setSavedDisplay] = useState('')
 
-  // Modal states
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editItem, setEditItem] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    targetAmount: "",
-    savedAmount: "",
-  });
-  const [targetAmountDisplay, setTargetAmountDisplay] = useState("");
-  const [savedAmountDisplay, setSavedAmountDisplay] = useState("");
-
-  useEffect(() => {
-    fetchAllData();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!loading) {
-        fetchWishlists();
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [search]);
+  useEffect(() => { fetchAllData() }, [])
 
   const fetchAllData = async () => {
-    setLoading(true);
-
+    setLoading(true)
     if (DEBUG_MODE.ENABLED) {
       setTimeout(() => {
-        setSummary({ saldo: DUMMY_SUMMARY.saldo });
-        setWishlists(DUMMY_WISHLIST);
-        setLoading(false);
-      }, 500);
-      return;
+        setSummary({ saldo: DUMMY_SUMMARY.saldo }); setWishlists(DUMMY_WISHLIST); setLoading(false)
+      }, 500)
+      return
     }
-
     try {
-      const [summaryRes, wishlistRes] = await Promise.all([
-        transactionService.getSummary(),
-        wishlistService.getWishlists(),
-      ]);
-      setSummary(summaryRes.data);
-      setWishlists(wishlistRes.data);
-    } catch (error) {
-      toast.error("Gagal memuat data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchWishlists = async () => {
-    try {
-      const res = await wishlistService.getWishlists(search);
-      setWishlists(res.data);
-    } catch (error) {
-      toast.error("Gagal memuat wishlist");
-    }
-  };
-
-  const openAddModal = () => {
-    setEditItem(null);
-    setFormData({
-      name: "",
-      targetAmount: "",
-      savedAmount: "0",
-    });
-    setTargetAmountDisplay("");
-    setSavedAmountDisplay("");
-    setModalOpen(true);
-  };
-
-  const openEditModal = (item) => {
-    setEditItem(item);
-    setFormData({
-      name: item.name,
-      targetAmount: item.target_amount.toString(),
-      savedAmount: item.saved_amount.toString(),
-    });
-    setTargetAmountDisplay(formatRupiahInput(item.target_amount.toString()));
-    setSavedAmountDisplay(formatRupiahInput(item.saved_amount.toString()));
-    setModalOpen(true);
-  };
-
-  // Handler untuk input target amount
-  const handleTargetAmountChange = (e) => {
-    const rawValue = e.target.value;
-    const formatted = formatRupiahInput(rawValue);
-    const numericValue = parseRupiahToNumber(formatted);
-
-    setTargetAmountDisplay(formatted);
-    setFormData({ ...formData, targetAmount: numericValue.toString() });
-  };
-
-  // Handler untuk input saved amount
-  const handleSavedAmountChange = (e) => {
-    const rawValue = e.target.value;
-    const formatted = formatRupiahInput(rawValue);
-    const numericValue = parseRupiahToNumber(formatted);
-
-    setSavedAmountDisplay(formatted);
-    setFormData({ ...formData, savedAmount: numericValue.toString() });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const target = parseInt(formData.targetAmount);
-    const saved = parseInt(formData.savedAmount) || 0;
-
-    if (!formData.name.trim()) {
-      toast.error("Nama wishlist harus diisi");
-      return;
-    }
-    if (!target || target <= 0) {
-      toast.error("Target nominal harus lebih dari 0");
-      return;
-    }
-    if (saved < 0) {
-      toast.error("Nominal terkumpul tidak valid");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const data = {
-        name: formData.name.trim(),
-        targetAmount: target,
-        savedAmount: saved,
-      };
-
-      if (editItem) {
-        await wishlistService.updateWishlist(editItem.id, data);
-        toast.success("Wishlist berhasil diupdate");
-      } else {
-        await wishlistService.createWishlist(data);
-        toast.success("Wishlist berhasil ditambahkan");
-      }
-
-      setModalOpen(false);
-      await fetchAllData();
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Gagal menyimpan");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!confirm("Yakin ingin menghapus wishlist ini?")) return;
-
-    setLoading(true);
-    try {
-      await wishlistService.deleteWishlist(id);
-      toast.success("Wishlist berhasil dihapus");
-      await fetchAllData();
-    } catch (error) {
-      toast.error("Gagal menghapus wishlist");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateProgress = (saved, target) => {
-    if (!target) return 0;
-    return Math.min(100, Math.round((saved / target) * 100));
-  };
-
-  if (loading && !modalOpen) {
-    return <LoadingSpinner />;
+      const [sr, wr] = await Promise.all([transactionService.getSummary(), wishlistService.getWishlists()])
+      setSummary(sr.data); setWishlists(wr.data)
+    } catch { toast.error('Gagal memuat data') }
+    finally { setLoading(false) }
   }
 
+  const openAddModal = () => {
+    setEditItem(null); setFormData({ name: '', targetAmount: '', savedAmount: '0', category: 'tabungan' })
+    setTargetDisplay(''); setSavedDisplay(''); setModalOpen(true)
+  }
+
+  const openEditModal = (item) => {
+    setEditItem(item)
+    setFormData({ name: item.name, targetAmount: item.target_amount.toString(), savedAmount: item.saved_amount.toString(), category: catMap[item.id] || 'tabungan' })
+    setTargetDisplay(formatRupiahInput(item.target_amount.toString()))
+    setSavedDisplay(formatRupiahInput(item.saved_amount.toString()))
+    setModalOpen(true)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const target = parseInt(formData.targetAmount), saved = parseInt(formData.savedAmount) || 0
+    if (!formData.name.trim()) { toast.error('Nama wishlist harus diisi'); return }
+    if (!target || target <= 0) { toast.error('Target nominal harus lebih dari 0'); return }
+    setLoading(true)
+    try {
+      const data = { name: formData.name.trim(), targetAmount: target, savedAmount: saved }
+      if (editItem) { await wishlistService.updateWishlist(editItem.id, data); toast.success('Wishlist berhasil diupdate') }
+      else { await wishlistService.createWishlist(data); toast.success('Wishlist berhasil ditambahkan') }
+      // Save category locally
+      const id = editItem?.id ?? '__pending__'
+      const updated = { ...catMap }
+      if (editItem) updated[editItem.id] = formData.category
+      setCatMap(updated); saveCats(updated)
+      setModalOpen(false); await fetchAllData()
+      // After fetch, find the newly created item and assign its category
+    } catch (err) { toast.error(err.response?.data?.message || 'Gagal menyimpan') }
+    finally { setLoading(false) }
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('Yakin ingin menghapus wishlist ini?')) return
+    setLoading(true)
+    try {
+      await wishlistService.deleteWishlist(id); toast.success('Wishlist berhasil dihapus')
+      const updated = { ...catMap }; delete updated[id]; setCatMap(updated); saveCats(updated)
+      await fetchAllData()
+    } catch { toast.error('Gagal menghapus wishlist') }
+    finally { setLoading(false) }
+  }
+
+  const calcProgress = (s, t) => !t ? 0 : Math.min(100, Math.round((s / t) * 100))
+
+  const filtered = wishlists
+    .filter(w => !search || w.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(w => !filterCat || (catMap[w.id] || 'tabungan') === filterCat)
+
+  // Aggregate stats
+  const totalTarget = wishlists.reduce((s, w) => s + w.target_amount, 0)
+  const totalSaved = wishlists.reduce((s, w) => s + w.saved_amount, 0)
+  const avgProgress = wishlists.length ? Math.round(wishlists.reduce((s, w) => s + calcProgress(w.saved_amount, w.target_amount), 0) / wishlists.length) : 0
+
+  if (loading && !modalOpen) return <LoadingSpinner />
+
   return (
-    <div className="text-white p-5 min-[901px]:p-8 animate-fade-in font-['Inter',_sans-serif]">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
-        <h2 className="text-[28px] font-bold m-0">Wishlist Saya</h2>
-        <button
-          onClick={openAddModal}
-          className="w-full sm:w-auto bg-emerald-600 text-white px-6 py-3.5 rounded-xl font-bold text-[15px] hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-lg"
-        >
-          + Tambah Wishlist
-        </button>
-      </div>
+    <div className="text-white pb-10 animate-fade-in">
 
-      <div className="bg-emerald-600 rounded-2xl py-5 px-6 mb-8">
-        <p className="text-white/80 text-[13px] font-medium mb-1">Saldo Tersedia</p>
-        <p className="text-[28px] font-bold m-0 tracking-tight">Rp {formatRupiah(summary.saldo)}</p>
-      </div>
-
-      <div className="mb-8">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Cari wishlist..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#2A2A2A] border border-white/5 text-white rounded-xl px-4 py-3.5 outline-none focus:ring-1 focus:ring-emerald-500/50 transition-all text-[15px]"
-          />
+      {/* Overview strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-5">
+        <div className="rounded-xl p-3 min-[901px]:p-3.5 flex flex-col gap-1.5 bg-gradient-to-br from-emerald-700 to-teal-900 ring-1 ring-white/[0.08] shadow-[0_4px_16px_rgba(16,185,129,0.12)]">
+          <p className="text-[10px] text-emerald-100/70 uppercase tracking-widest font-medium">Saldo Tersedia</p>
+          <p className="text-[17px] font-semibold leading-tight tabular-nums">Rp {formatRupiah(summary.saldo)}</p>
+        </div>
+        <div className="rounded-xl p-3 min-[901px]:p-3.5 flex flex-col gap-1.5 bg-gradient-to-br from-slate-700 to-slate-900 ring-1 ring-white/[0.08] shadow-[0_4px_16px_rgba(99,102,241,0.08)]">
+          <p className="text-[10px] text-slate-300/70 uppercase tracking-widest font-medium">Total Target</p>
+          <p className="text-[17px] font-semibold leading-tight tabular-nums">Rp {formatRupiah(totalTarget)}</p>
+        </div>
+        <div className="rounded-xl p-3 min-[901px]:p-3.5 flex flex-col gap-1.5 tq-card ring-1 ring-white/[0.08]">
+          <p className="text-[10px] text-white/40 uppercase tracking-widest font-medium">Rata-rata Progress</p>
+          <div className="flex items-end gap-2">
+            <p className="text-[17px] font-semibold leading-tight">{avgProgress}<span className="text-[12px] font-normal text-white/40">%</span></p>
+            <p className="text-[10px] text-white/35 mb-0.5">{wishlists.length} wishlist</p>
+          </div>
+          <div className="h-1 w-full rounded-full bg-white/[0.08] mt-0.5">
+            <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${avgProgress}%` }} />
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {wishlists.length === 0 ? (
-          <div className="col-span-full text-center py-16 text-white/30 border border-dashed border-white/10 rounded-2xl">
-            Belum ada wishlist. Yuk buat wishlist pertama!
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Category filter tabs */}
+          <div className="flex rounded-xl border border-white/[0.09] overflow-hidden text-[12px] font-medium">
+            <button onClick={() => setFilterCat('')}
+              className={`px-3 py-1.5 transition ${filterCat === '' ? 'bg-white/[0.12] text-white' : 'text-white/45 hover:text-white hover:bg-white/[0.06]'}`}>
+              Semua
+            </button>
+            {CATEGORIES.map(c => (
+              <button key={c.value} onClick={() => setFilterCat(c.value)}
+                className={`px-3 py-1.5 transition ${filterCat === c.value ? 'bg-white/[0.12] text-white' : 'text-white/45 hover:text-white hover:bg-white/[0.06]'}`}>
+                {c.label.split(' ')[0]}
+              </button>
+            ))}
+          </div>
+          <input type="text" placeholder="Cari wishlist..." value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="tq-field px-3 py-1.5 text-[12px] w-40 sm:w-52" />
+        </div>
+        <button onClick={openAddModal}
+          className="sm:self-auto self-stretch flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-medium text-[13px] transition-colors active:scale-[0.98]">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Tambah Wishlist
+        </button>
+      </div>
+
+      {/* Cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.length === 0 ? (
+          <div className="col-span-full py-16 text-center text-[13px] text-white/30 border border-dashed border-white/[0.09] rounded-2xl">
+            {wishlists.length === 0 ? 'Belum ada wishlist. Yuk buat wishlist pertama!' : 'Tidak ada wishlist yang cocok.'}
           </div>
         ) : (
-          wishlists.map((item) => {
-            const progress = calculateProgress(
-              item.saved_amount,
-              item.target_amount,
-            );
+          filtered.map(item => {
+            const prog = calcProgress(item.saved_amount, item.target_amount)
+            const cat = catMap[item.id] || 'tabungan'
+            const catInfo = getCatInfo(cat)
+            const sisa = Math.max(0, item.target_amount - item.saved_amount)
             return (
-              <div key={item.id} className="bg-gray-800 border border-white/5 rounded-2xl p-6 flex flex-col shadow-lg">
-                <h3 className="text-[19px] font-bold text-white mb-4 m-0">{item.name}</h3>
-
-                <div className="space-y-3 text-[14px]">
-                  <div className="flex justify-between">
-                    <span className="text-white/40">Target:</span>
-                    <span className="font-bold">
-                      Rp {formatRupiah(item.target_amount)}
-                    </span>
+              <div key={item.id} className="tq-card p-5 flex flex-col gap-0 hover:shadow-[0_8px_32px_rgba(0,0,0,0.45)] transition-all duration-200">
+                {/* Card header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-[14px] font-bold text-white m-0 truncate">{item.name}</h3>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Terkumpul:</span>
-                    <span className="font-bold">
-                      Rp {formatRupiah(item.saved_amount)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Sisa:</span>
-                    <span className="font-bold">
-                      Rp {formatRupiah(Math.max(0, item.target_amount - item.saved_amount))}
-                    </span>
-                  </div>
+                  <span className={`tq-badge ml-2 shrink-0 ${catInfo.badge}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${catInfo.dot}`} />
+                    {catInfo.label.split(' ')[0]}
+                  </span>
                 </div>
 
-                <div className="mt-4">
-                  <div className="flex justify-between text-xs mb-1.5 font-medium">
-                    <span className="text-white/30">PROGRESS</span>
-                    <span className="text-white/60">{progress}%</span>
-                  </div>
-                  <div className="w-full bg-white/5 rounded-full h-2">
-                    <div
-                      className="bg-emerald-500 rounded-full h-2 transition-all duration-700"
-                      style={{
-                        width: `${progress}%`,
-                      }}
-                    />
-                  </div>
+                {/* Stats */}
+                <div className="space-y-1.5 text-[12px] mb-4">
+                  <div className="flex justify-between"><span className="text-white/40">Target</span><span className="font-semibold text-white/85">Rp {formatRupiah(item.target_amount)}</span></div>
+                  <div className="flex justify-between"><span className="text-white/40">Terkumpul</span><span className="font-semibold text-emerald-400">Rp {formatRupiah(item.saved_amount)}</span></div>
+                  <div className="flex justify-between"><span className="text-white/40">Sisa</span><span className="font-semibold text-white/55">Rp {formatRupiah(sisa)}</span></div>
                 </div>
 
-                <div className="flex justify-end gap-6 mt-6 pt-4 border-t border-white/5">
-                  <button
-                    onClick={() => openEditModal(item)}
-                    className="bg-transparent border-none text-blue-400 hover:text-blue-300 text-[14px] font-bold cursor-pointer transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="bg-transparent border-none text-red-400 hover:text-red-300 text-[14px] font-bold cursor-pointer transition-colors"
-                  >
-                    Hapus
-                  </button>
+                {/* Progress */}
+                <div className="mb-4">
+                  <div className="flex justify-between text-[11px] mb-1.5">
+                    <span className="text-white/25 uppercase tracking-wider font-semibold">Progress</span>
+                    <span className={`font-bold ${prog >= 100 ? 'text-emerald-400' : 'text-white/60'}`}>{prog}%</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-white/[0.08] overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-700 ${progressColor(cat)}`} style={{ width: `${prog}%` }} />
+                  </div>
+                  {prog >= 100 && <p className="text-[11px] text-emerald-400 mt-1 font-medium">🎉 Target tercapai!</p>}
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-4 mt-auto pt-3 border-t border-white/[0.07]">
+                  <button onClick={() => openEditModal(item)} className="text-[12px] font-medium text-blue-400 hover:text-blue-300 transition">Edit</button>
+                  <button onClick={() => handleDelete(item.id)} className="text-[12px] font-medium text-red-400 hover:text-red-300 transition">Hapus</button>
                 </div>
               </div>
-            );
+            )
           })
         )}
       </div>
 
-      <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editItem ? "Edit Wishlist" : "Tambah Wishlist"}
-      >
-        <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Modal */}
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editItem ? 'Edit Wishlist' : 'Tambah Wishlist'}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-white/60 mb-1.5">
-              Nama Wishlist
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full bg-gray-700 border-none text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-[15px]"
-              placeholder="Contoh: Laptop Baru"
-              required
-            />
+            <label className="block text-[12px] text-white/50 mb-1.5">Nama Wishlist</label>
+            <input type="text" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+              className="tq-field w-full px-3 py-2.5 text-[13px]" placeholder="Contoh: Laptop Baru" required />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-white/60 mb-1.5">
-              Target Nominal
-            </label>
+            <label className="block text-[12px] text-white/50 mb-1.5">Kategori</label>
+            <select value={formData.category} onChange={e => setFormData(p => ({ ...p, category: e.target.value }))}
+              className="tq-field tq-select w-full px-3 py-2.5 text-[13px]">
+              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[12px] text-white/50 mb-1.5">Target Nominal (Rp)</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/30">
-                Rp
-              </span>
-              <input
-                type="text"
-                value={targetAmountDisplay}
-                onChange={handleTargetAmountChange}
-                placeholder="0"
-                className="w-full bg-gray-700 border-none text-white rounded-xl pl-12 pr-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-[16px]"
-                required
-              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-white/40">Rp</span>
+              <input type="text" inputMode="numeric" value={targetDisplay}
+                onChange={e => { const f = formatRupiahInput(e.target.value); setTargetDisplay(f); setFormData(p => ({ ...p, targetAmount: parseNum(f).toString() })) }}
+                placeholder="0" className="tq-field w-full pl-8 pr-3 py-2.5 text-[13px]" required />
             </div>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-white/60 mb-1.5">
-              Sudah Terkumpul
-            </label>
+            <label className="block text-[12px] text-white/50 mb-1.5">Sudah Terkumpul (Rp)</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/30">
-                Rp
-              </span>
-              <input
-                type="text"
-                value={savedAmountDisplay}
-                onChange={handleSavedAmountChange}
-                placeholder="0"
-                className="w-full bg-gray-700 border-none text-white rounded-xl pl-12 pr-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-[16px]"
-              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-white/40">Rp</span>
+              <input type="text" inputMode="numeric" value={savedDisplay}
+                onChange={e => { const f = formatRupiahInput(e.target.value); setSavedDisplay(f); setFormData(p => ({ ...p, savedAmount: parseNum(f).toString() })) }}
+                placeholder="0" className="tq-field w-full pl-8 pr-3 py-2.5 text-[13px]" />
             </div>
-            <p className="text-[12px] text-white/30 mt-2">
-              * Kosongi jika belum ada tabungan
-            </p>
+            <p className="text-[11px] text-white/30 mt-1">* Kosongi atau isi 0 jika belum ada tabungan</p>
           </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => setModalOpen(false)}
-              className="flex-1 py-3 bg-white/5 text-white rounded-xl hover:bg-white/10 transition-colors text-[14px] font-bold"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all text-[14px] font-bold disabled:opacity-50"
-            >
-              {loading ? "Menyimpan..." : "Simpan"}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={() => setModalOpen(false)}
+              className="flex-1 rounded-xl border border-white/10 bg-white/[0.06] py-2.5 text-[13px] font-medium text-white transition hover:bg-white/[0.1]">Batal</button>
+            <button type="submit" disabled={loading}
+              className="flex-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-2.5 text-[13px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60">
+              {loading ? 'Menyimpan...' : 'Simpan'}
             </button>
           </div>
         </form>
@@ -395,5 +284,5 @@ export default function Wishlist() {
 
       <Footer />
     </div>
-  );
+  )
 }
